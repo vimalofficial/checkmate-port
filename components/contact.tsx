@@ -147,13 +147,12 @@
 //   );
 // }
 
-
-
 "use client";
 
 import { useEffect, useRef } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import Image from "next/image";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -179,11 +178,7 @@ export function Contact() {
   }, []);
 
   return (
-    <section
-      id="contact"
-      ref={containerRef}
-      className="py-24 px-6 bg-[#f1f1f1]"
-    >
+    <section id="contact" ref={containerRef} className="py-9 px-3 bg-[#f1f1f1]">
       <div className="max-w-6xl mx-auto">
         <div
           ref={contentRef}
@@ -194,39 +189,62 @@ export function Contact() {
             <h2 className="text-3xl md:text-4xl !text-black font-bold text-foreground mb-6">
               Let’s Build Something Scalable
             </h2>
-
             <p className="text-muted-foreground text-base !text-black leading-relaxed mb-8">
-              If you're looking for a developer who can design REST APIs,
-              deploy production-ready applications on AWS, configure SSL,
-              integrate payment systems, and build scalable full-stack
-              platforms — let’s connect.
+              If you're looking for a developer who can design REST APIs, deploy
+              production-ready applications on AWS, configure SSL, integrate
+              payment systems, and build scalable full-stack platforms — let’s
+              connect.
             </p>
-
-            <div className="space-y-4 text-sm text-muted-foreground ">
-              <p className="text-black">
-                📧 Email:{" "}
+            import Image from "next/image";
+            <div className="space-y-4 text-sm text-muted-foreground">
+              {/* Email */}
+              <div className="flex items-center gap-2 text-black">
+                <Image
+                  src="/email.png"
+                  alt="Email"
+                  width={18}
+                  height={18}
+                  className="object-contain"
+                />
+                <span>Email:</span>
                 <a
-                  href="mailto:your@email.com"
+                  href="mailto:vimalpk.official@gmail.com"
                   className="text-accent hover:underline"
                 >
                   vimalpk.official@gmail.com
                 </a>
-              </p>
+              </div>
 
-              <p className="text-black">
-                💼 LinkedIn:{" "}
+              {/* LinkedIn */}
+              <div className="flex items-center gap-2 text-black">
+                <Image
+                  src="/download.png"
+                  alt="LinkedIn"
+                  width={18}
+                  height={18}
+                  className="object-contain"
+                />
+                <span>LinkedIn:</span>
                 <a
                   href="https://www.linkedin.com/in/vimal-pk-b140a3285/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-accent hover:underline"
                 >
-                  https://www.linkedin.com/in/vimal-pk-b140a3285/
+                  linkedin.com/in/vimal-pk-b140a3285
                 </a>
-              </p>
+              </div>
 
-              <p className="text-black">
-                🧑‍💻 GitHub:{" "}
+              {/* GitHub */}
+              <div className="flex items-center gap-2 text-black">
+                <Image
+                  src="/github.png"
+                  alt="GitHub"
+                  width={18}
+                  height={18}
+                  className="object-contain"
+                />
+                <span>GitHub:</span>
                 <a
                   href="https://github.com/vimalofficial"
                   target="_blank"
@@ -235,7 +253,7 @@ export function Contact() {
                 >
                   github.com/vimalofficial
                 </a>
-              </p>
+              </div>
             </div>
           </div>
 
@@ -291,12 +309,7 @@ export function Contact() {
           </div>
         </div>
 
-        {/* FOOTER NOTE */}
-        <div className="mt-20 text-center text-sm text-muted-foreground">
-          © {new Date().getFullYear()} Vimal PK. Built with Next.js & GSAP.
-        </div>
       </div>
     </section>
   );
 }
-

@@ -146,11 +146,11 @@ export function Portfolio() {
   }, []);
 
   return (
-    <section id="portfolio" ref={containerRef} className="py-20 px-6 bg-card/30">
+    <section id="portfolio" ref={containerRef} className="py-10 px-3 bg-card/30">
       <div className="max-w-6xl mx-auto">
 
         {/* TITLE */}
-        <div className="mb-14">
+        <div className="mb-4">
           <h2
             ref={titleRef}
             className="text-3xl md:text-4xl font-bold text-foreground mb-4"
@@ -161,7 +161,7 @@ export function Portfolio() {
             Full-stack developer specializing in scalable backend systems,
             cloud deployment, and production-ready web applications.
           </p> */}
-          <p className="text-muted-foreground text-lg max-w-3xl">
+          <p className="text-muted-foreground text-md max-w-3xl">
            I am capable of  Plan | Design | Develop | Deploy | Integrate | Optimize
           </p>
         </div>
@@ -169,7 +169,7 @@ export function Portfolio() {
         {/* CONTENT */}
         <div
           ref={contentRef}
-          className="grid md:grid-cols-2 gap-12 items-start"
+          className="grid md:grid-cols-2 gap-7 items-start"
         >
           {/* LEFT TEXT */}
           <div className="space-y-6 text-muted-foreground leading-relaxed">
