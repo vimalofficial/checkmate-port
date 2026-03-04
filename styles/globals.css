@@ -136,8 +136,7 @@
 html {
   scroll-behavior: smooth;
 }
-
-@keyframes shakePhone {
+@keyframes shake {
   0% { transform: rotate(0deg); }
   20% { transform: rotate(-18deg); }
   40% { transform: rotate(18deg); }
@@ -147,5 +146,5 @@ html {
 }
 
 .shake {
-  animation: shakePhone 0.7s ease;
+  animation: shake 0.6s ease;
 }

@@ -79,11 +79,11 @@ export function Hero() {
           <div>
             <h3
               ref={titleRef}
-              className="text-3xl md:text-5xl font-bold text-foreground mb-4 leading-snug"
+              className="text-3xl md:text-5xl font-bold text-foreground  leading-snug"
             >
-              I'm <span className="text-accent">Vimal PK</span>
+              I'm <span className="text-accent ">Vimal PK</span>
             </h3>
-
+            <h5 className="mb-4">vimalpk.official@gmail.com</h5>
             <h5>Skills :</h5>
 
             <p
