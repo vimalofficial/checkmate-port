@@ -22,6 +22,7 @@ export async function POST(req: Request) {
 
     });
 
+    // 1️⃣ Send resume to requester
     await transporter.sendMail({
 
       from: process.env.EMAIL_FROM,
@@ -46,6 +47,32 @@ export async function POST(req: Request) {
         <p>Regards</p>
 
         <b>Vimal PK</b>
+      `
+
+    });
+
+
+    // 2️⃣ Send notification to admin
+    await transporter.sendMail({
+
+      from: process.env.EMAIL_FROM,
+
+      to: process.env.ADMIN_EMAIL,
+
+      subject: "Resume Download Notification",
+
+      html: `
+        <h2>Resume Download Alert</h2>
+
+        <p>Someone requested your resume from the portfolio.</p>
+
+        <p><strong>Email:</strong> ${email}</p>
+
+        <p>This user downloaded your resume.</p>
+
+        <hr/>
+
+        <p>Portfolio Notification System</p>
       `
 
     });
