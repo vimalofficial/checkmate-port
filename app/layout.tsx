@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
+import { ToastProvider, ToastViewport } from '@/components/ui/toast';
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -9,11 +10,11 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: 'Vimal - Full-Stack Developer',
   description: 'Professional Full-Stack Developer specializing in TypeScript, React, Node.js, and scalable web applications',
-  generator: 'v0.app',
+  generator: 'vimal-official.vercel.app',
   icons: {
     icon: [
       {
-        url: '/favicon.svg',
+        url: '/faviiconv1.svg',
         type: 'image/svg+xml',
       },
     ],
@@ -28,8 +29,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="font-sans antialiased">
+        <ToastProvider>
         {children}
+
         <Analytics />
+        <ToastViewport />
+        </ToastProvider>
       </body>
     </html>
   )

@@ -3,8 +3,25 @@
 import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import Image from "next/image";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+
+import { Spinner } from "@/components/ui/spinner";
+
+import { Toast, ToastTitle, ToastDescription } from "@/components/ui/toast";
 
 export function Hero() {
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+
   const [isHovering, setIsHovering] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
@@ -12,6 +29,74 @@ export function Hero() {
   const imageRef = useRef<HTMLDivElement>(null);
   const socialRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLDivElement>(null);
+
+  const [openToast, setOpenToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+
+  const validateEmail = (value: string) => {
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!regex.test(value)) {
+      setError("Invalid email address");
+      return false;
+    }
+
+    setError("");
+    return true;
+  };
+
+  // const sendResume = async () => {
+  //   if (!validateEmail(email)) return;
+
+  //   setLoading(true);
+
+  //   const res = await fetch("/api/send-resume", {
+  //     method: "POST",
+  //     headers: {
+  //       "Content-Type": "application/json",
+  //     },
+  //     body: JSON.stringify({ email }),
+  //   });
+
+  //   setLoading(false);
+
+  //   if (res.ok) {
+  //     setToastMessage("Resume sent successfully. Check your email.");
+  //     setOpenToast(true);
+  //     setEmail("");
+  //   } else {
+  //     setToastMessage("Failed to send email. Please try again.");
+  //     setOpenToast(true);
+  //   }
+  // };
+
+  const sendResume = async () => {
+    if (!validateEmail(email)) return;
+
+    setLoading(true);
+
+    const res = await fetch("/api/send-resume", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email }),
+    });
+
+    setLoading(false);
+
+    if (res.ok) {
+      setToastMessage("Resume sent successfully. Check your email.");
+      setOpenToast(true);
+
+      setEmail("");
+
+      setDialogOpen(false); // 👈 CLOSE DIALOG
+    } else {
+      setToastMessage("Failed to send email.");
+      setOpenToast(true);
+    }
+  };
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -98,12 +183,7 @@ export function Hero() {
             {/* Buttons Row */}
             {/* Buttons */}
             <div ref={buttonRef} className="flex flex-col gap-3">
-              {/* Download Resume */}
-              {/* <button className="w-fit px-4 py-2 text-sm sm:px-6 sm:py-2.5 sm:text-sm md:text-base bg-accent text-accent-foreground rounded-full font-medium hover:opacity-90 transition-all duration-300 shadow-md hover:shadow-lg">
-                Download Resume
-              </button> */}
-
-              <a
+              {/* <a
                 href="https://aortepjbbvixlgouowra.supabase.co/storage/v1/object/public/vimal-official/resume/Vimal_PK.pdf"
                 download
                 className="inline-block w-fit px-4 py-2 text-sm sm:px-6 sm:py-2.5 sm:text-sm md:text-base bg-accent text-accent-foreground rounded-full font-medium hover:opacity-90 transition-all duration-300 shadow-md hover:shadow-lg"
@@ -111,6 +191,48 @@ export function Hero() {
                 Download Resume
               </a>
 
+              <Dialog /> */}
+              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <DialogTrigger asChild>
+                  <button className="inline-block w-fit px-4 py-2 text-sm sm:px-6 sm:py-2.5 md:text-base bg-accent text-accent-foreground rounded-full font-medium hover:opacity-90 transition-all duration-300 shadow-md hover:shadow-lg">
+                    Download Resume
+                  </button>
+                </DialogTrigger>
+
+                <DialogContent>
+                  <DialogTitle>Get My Resume</DialogTitle>
+
+                  <DialogDescription>
+                    Enter your email to receive the resume.
+                  </DialogDescription>
+
+                  <input
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full border rounded-md p-2"
+                  />
+
+                  {error && <p className="text-red-500 text-sm">{error}</p>}
+
+                  <button
+                    onClick={sendResume}
+                    disabled={loading}
+                    className="mt-3 flex items-center justify-center gap-2 bg-accent text-accent-foreground px-4 py-2 rounded-md w-full"
+                  >
+                    {loading && <Spinner />}
+                    {loading ? "Sending..." : "Send Resume"}
+                  </button>
+                </DialogContent>
+              </Dialog>
+
+              <Toast open={openToast} onOpenChange={setOpenToast}>
+                {/* <ToastTitle>
+                  Vimal PK <br /> Portfolio
+                </ToastTitle> */}
+                <ToastDescription>{toastMessage}</ToastDescription>
+              </Toast>
               {/* Social Buttons */}
               <div className="flex gap-3 flex-wrap">
                 {/* GitHub */}
