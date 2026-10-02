@@ -54,6 +54,17 @@ const DOT_SPEED = 70;
 /** Approx. seconds between consecutive dots on the same line */
 const DOT_SPACING_SECONDS = 1.8;
 
+/* ---------- LINE + DOT SIZE (change these to resize) ---------- */
+
+/** Thickness of the dashed connection lines */
+const LINE_WIDTH = 2.6;
+/** Dash pattern: "dash gap" */
+const LINE_DASH = "8 9";
+/** Radius of the flowing dot */
+const DOT_RADIUS = 5.5;
+/** Radius of the soft glow ring around the dot */
+const DOT_GLOW_RADIUS = 11;
+
 type Side = "top" | "bottom" | "left" | "right";
 
 /* =========================================
@@ -167,6 +178,15 @@ const INFRA_EDGES: DiagramEdge[] = [
   { from: "master", to: "service", fromSide: "bottom", toSide: "top" },
   { from: "service", to: "ingress", fromSide: "bottom", toSide: "top" },
   { from: "ingress", to: "app", fromSide: "bottom", toSide: "right" },
+];
+
+/* =========================================
+   TABS
+========================================= */
+
+const TABS: { id: ArchitectureTab; label: string }[] = [
+  { id: "dev", label: "DEV" },
+  { id: "infra", label: "DEPLOY" },
 ];
 
 /* =========================================
@@ -379,21 +399,21 @@ export function Hero() {
               <div className="absolute bottom-[15%] right-[15%] w-52 h-52 bg-accent/5 rounded-full blur-3xl" />
             </div>
 
-            {/* DEV / INFRA TABS */}
+            {/* DEV / DEPLOY TABS */}
             <div className="relative z-40 mb-4 flex">
               <div className="flex items-center p-1 rounded-lg border border-border/60 bg-card/80 backdrop-blur-md">
-                {(["dev", "Deploy"] as const).map((tab) => (
+                {TABS.map((tab) => (
                   <button
-                    key={tab}
+                    key={tab.id}
                     type="button"
-                    onClick={() => setActiveTab(tab)}
+                    onClick={() => setActiveTab(tab.id)}
                     className={`px-5 py-2 rounded-md text-xs font-medium transition-all duration-300 ${
-                      activeTab === tab
+                      activeTab === tab.id
                         ? "bg-accent text-accent-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {tab.toUpperCase()}
+                    {tab.label}
                   </button>
                 ))}
               </div>
@@ -615,21 +635,29 @@ function Diagram({
         className="absolute inset-0 w-full h-full pointer-events-none"
         viewBox={`0 0 ${STAGE_W} ${STAGE_H}`}
       >
+        {/* Dashed connection lines (thicker + more visible) */}
         <g
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.4"
-          strokeDasharray="4 7"
-          className="text-muted-foreground/30"
+          strokeWidth={LINE_WIDTH}
+          strokeDasharray={LINE_DASH}
+          strokeLinecap="round"
+          className="text-muted-foreground/55"
         >
           {paths.map((p) => (
             <path key={p.id} id={p.id} d={p.d} />
           ))}
         </g>
 
+        {/* Flowing dots: glow ring + solid core, moved together as a group */}
         <g>
           {dots.map((dot) => (
-            <circle key={dot.key} r="3" className="fill-accent" opacity="0">
+            <g key={dot.key} opacity="0">
+              {/* soft glow ring */}
+              <circle r={DOT_GLOW_RADIUS} className="fill-accent" opacity="0.25" />
+              {/* solid dot */}
+              <circle r={DOT_RADIUS} className="fill-accent" />
+
               <animateMotion
                 dur={`${dot.dur}s`}
                 begin={`${dot.begin}s`}
@@ -647,7 +675,7 @@ function Diagram({
                 values="0;1;1;0"
                 keyTimes="0;0.08;0.92;1"
               />
-            </circle>
+            </g>
           ))}
         </g>
       </svg>
