@@ -1,10 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import gsap from "gsap";
 import Image from "next/image";
 
 type ArchitectureTab = "dev" | "infra";
+
+/** useLayoutEffect on the client, useEffect on the server (no SSR warning) */
+const useIsoLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 const TECH_STACK = [
   "Node.js",
@@ -47,12 +56,28 @@ const DOT_SPACING_SECONDS = 1.8;
 
 type Side = "top" | "bottom" | "left" | "right";
 
+/* =========================================
+   CARD COLOUR TONES
+   [r, g, b] — change these to restyle cards
+========================================= */
+
+type Tone = "cyan" | "violet" | "orange" | "blue" | "emerald";
+
+const TONES: Record<Tone, [number, number, number]> = {
+  cyan: [6, 182, 212],
+  violet: [139, 92, 246],
+  orange: [249, 115, 22],
+  blue: [59, 130, 246],
+  emerald: [16, 185, 129],
+};
+
 type DiagramNode = {
   id: string;
   title: string;
   subtitle: string;
   x: number;
   y: number;
+  tone: Tone;
   highlighted?: boolean;
 };
 
@@ -67,24 +92,25 @@ type DiagramEdge = {
 
 /* =========================================
    DEV DIAGRAM DATA
+   highlighted = cyan, normal = violet
 ========================================= */
 
 const DEV_NODES: DiagramNode[] = [
   // Left column
-  { id: "mysql", title: "MySQL/MongoDB", subtitle: "Database", x: 90, y: 45 },
-  { id: "redis", title: "Redis", subtitle: "Cache", x: 90, y: 205 },
-  { id: "google", title: "Google IDP", subtitle: "Identity Provider", x: 90, y: 375, highlighted: true },
+  { id: "mysql", title: "MySQL/MongoDB", subtitle: "Database", x: 90, y: 45, tone: "violet" },
+  { id: "redis", title: "Redis", subtitle: "Cache", x: 90, y: 205, tone: "violet" },
+  { id: "google", title: "Google IDP", subtitle: "Identity Provider", x: 90, y: 375, tone: "cyan", highlighted: true },
 
   // Center column
-  { id: "prisma", title: "Prisma ORM", subtitle: "Data Layer", x: 300, y: 130, highlighted: true },
-  { id: "api", title: "REST APIs", subtitle: "Node.js / Express", x: 300, y: 290, highlighted: true },
-  { id: "react", title: "React / Next.js", subtitle: "Frontend", x: 300, y: 460, highlighted: true },
+  { id: "prisma", title: "Prisma ORM", subtitle: "Data Layer", x: 300, y: 130, tone: "cyan", highlighted: true },
+  { id: "api", title: "REST APIs", subtitle: "Node.js / Express", x: 300, y: 290, tone: "cyan", highlighted: true },
+  { id: "react", title: "React / Next.js", subtitle: "Frontend", x: 300, y: 460, tone: "cyan", highlighted: true },
 
   // Right column
-  { id: "hfproxy", title: "HF Proxy", subtitle: "Model Gateway", x: 510, y: 45 },
-  { id: "jwt", title: "JWT", subtitle: "Authentication", x: 510, y: 205 },
-  { id: "webhooks", title: "Webhooks", subtitle: "3rd Party", x: 510, y: 290 },
-  { id: "payment", title: "Payment Gateway", subtitle: "External Service", x: 510, y: 375 },
+  { id: "hfproxy", title: "HF Proxy", subtitle: "Model Gateway", x: 510, y: 45, tone: "violet" },
+  { id: "jwt", title: "JWT", subtitle: "Authentication", x: 510, y: 205, tone: "violet" },
+  { id: "webhooks", title: "Webhooks", subtitle: "3rd Party", x: 510, y: 290, tone: "violet" },
+  { id: "payment", title: "Payment Gateway", subtitle: "External Service", x: 510, y: 375, tone: "violet" },
 ];
 
 const DEV_EDGES: DiagramEdge[] = [
@@ -102,25 +128,27 @@ const DEV_EDGES: DiagramEdge[] = [
 
 /* =========================================
    INFRA DIAGRAM DATA
+   server = orange, kubernetes = blue,
+   shared (source / app) = emerald
 ========================================= */
 
 const INFRA_NODES: DiagramNode[] = [
-  { id: "source", title: "Development", subtitle: "Source Code", x: 300, y: 40, highlighted: true },
+  { id: "source", title: "Development", subtitle: "Source Code", x: 300, y: 40, tone: "emerald", highlighted: true },
 
   // Server deployment (left)
-  { id: "clone", title: "Git Clone", subtitle: "Server Checkout", x: 95, y: 145 },
-  { id: "ubuntu", title: "Ubuntu Server", subtitle: "VM / Linux", x: 95, y: 230, highlighted: true },
-  { id: "pm2", title: "PM2", subtitle: "Process Manager", x: 95, y: 315, highlighted: true },
-  { id: "nginx", title: "Nginx / SSL", subtitle: "Reverse Proxy", x: 95, y: 400 },
+  { id: "clone", title: "Git Clone", subtitle: "Server Checkout", x: 95, y: 145, tone: "orange" },
+  { id: "ubuntu", title: "Ubuntu Server", subtitle: "VM / Linux", x: 95, y: 230, tone: "orange", highlighted: true },
+  { id: "pm2", title: "PM2", subtitle: "Process Manager", x: 95, y: 315, tone: "orange", highlighted: true },
+  { id: "nginx", title: "Nginx / SSL", subtitle: "Reverse Proxy", x: 95, y: 400, tone: "orange" },
 
   // Kubernetes deployment (right)
-  { id: "yaml", title: "K8s YAML", subtitle: "Deployment Manifests", x: 505, y: 145 },
-  { id: "master", title: "Kube Master", subtitle: "Control Plane", x: 505, y: 230, highlighted: true },
-  { id: "service", title: "K8s Service", subtitle: "Cluster Service", x: 505, y: 315, highlighted: true },
-  { id: "ingress", title: "NodePort / Ingress", subtitle: "External Entry Point", x: 505, y: 400 },
+  { id: "yaml", title: "K8s YAML", subtitle: "Deployment Manifests", x: 505, y: 145, tone: "blue" },
+  { id: "master", title: "Kube Master", subtitle: "Control Plane", x: 505, y: 230, tone: "blue", highlighted: true },
+  { id: "service", title: "K8s Service", subtitle: "Cluster Service", x: 505, y: 315, tone: "blue", highlighted: true },
+  { id: "ingress", title: "NodePort / Ingress", subtitle: "External Entry Point", x: 505, y: 400, tone: "blue" },
 
   // Shared
-  { id: "app", title: "Application", subtitle: "Frontend UI", x: 300, y: 485, highlighted: true },
+  { id: "app", title: "Application", subtitle: "Frontend UI", x: 300, y: 485, tone: "emerald", highlighted: true },
 ];
 
 const INFRA_EDGES: DiagramEdge[] = [
@@ -232,41 +260,79 @@ export function Hero() {
   const stageOuterRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLDivElement>(null);
 
+  /** true until the first tab-transition effect has been skipped */
+  const isFirstTabRender = useRef(true);
+
   const [activeTab, setActiveTab] = useState<ArchitectureTab>("dev");
 
-  /* ---------- HERO ENTRY ANIMATION ---------- */
+  /* ---------- HERO ENTRY ANIMATION ----------
+     - Elements are hidden by CSS (opacity-0) from the very first paint,
+       so there is no flash of final state before GSAP starts.
+     - Runs in a layout effect, AFTER ScaledStage has measured itself,
+       so the layout is already final when the animation begins.
+     - One timeline, no competing tweens.
+  ------------------------------------------- */
 
-  useEffect(() => {
+  useIsoLayoutEffect(() => {
+    const prefersReduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+
     const ctx = gsap.context(() => {
-      gsap.from(architectureRef.current, {
-        opacity: 0,
-        x: -30,
-        duration: 1.2,
-        ease: "power3.out",
+      if (prefersReduced) {
+        gsap.set([architectureRef.current, imageRef.current], {
+          opacity: 1,
+        });
+        return;
+      }
+
+      const tl = gsap.timeline({
+        defaults: { ease: "power3.out", duration: 1 },
       });
 
-      gsap.from(imageRef.current, {
-        opacity: 0,
-        scale: 0.95,
-        duration: 1.2,
-        delay: 0.2,
-        ease: "power3.out",
-      });
+      tl.fromTo(
+        architectureRef.current,
+        { opacity: 0, x: -30 },
+        { opacity: 1, x: 0, clearProps: "transform" }
+      ).fromTo(
+        imageRef.current,
+        { opacity: 0, scale: 0.96 },
+        { opacity: 1, scale: 1, clearProps: "transform" },
+        "-=0.8"
+      );
     }, containerRef);
 
     return () => ctx.revert();
   }, []);
 
-  /* ---------- TAB TRANSITION (diagram only) ---------- */
+  /* ---------- TAB TRANSITION (diagram only) ----------
+     Skips the very first run so it never fights the entry animation.
+  ---------------------------------------------------- */
 
   useEffect(() => {
+    if (isFirstTabRender.current) {
+      isFirstTabRender.current = false;
+      return;
+    }
+
     if (!stageOuterRef.current) return;
 
-    gsap.fromTo(
+    const tween = gsap.fromTo(
       stageOuterRef.current,
       { opacity: 0.65, y: 8 },
-      { opacity: 1, y: 0, duration: 0.35, ease: "power2.out" }
+      {
+        opacity: 1,
+        y: 0,
+        duration: 0.35,
+        ease: "power2.out",
+        overwrite: "auto",
+        clearProps: "transform",
+      }
     );
+
+    return () => {
+      tween.kill();
+    };
   }, [activeTab]);
 
   return (
@@ -290,6 +356,9 @@ export function Hero() {
             .tech-marquee:hover .tech-marquee-track {
               animation-play-state: paused;
             }
+            @media (prefers-reduced-motion: reduce) {
+              .tech-marquee-track { animation: none; }
+            }
           `,
         }}
       />
@@ -300,7 +369,10 @@ export function Hero() {
         <div className="grid md:grid-cols-2 gap-10 md:gap-12 items-center">
           {/* ---------- LEFT: ARCHITECTURE MAP ---------- */}
 
-          <div ref={architectureRef} className="relative w-full">
+          <div
+            ref={architectureRef}
+            className="relative w-full opacity-0 will-change-transform"
+          >
             {/* Background glow */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
               <div className="absolute top-[20%] left-[25%] w-40 h-40 bg-accent/5 rounded-full blur-3xl" />
@@ -310,7 +382,7 @@ export function Hero() {
             {/* DEV / INFRA TABS */}
             <div className="relative z-40 mb-4 flex">
               <div className="flex items-center p-1 rounded-lg border border-border/60 bg-card/80 backdrop-blur-md">
-                {(["dev", "infra"] as const).map((tab) => (
+                {(["dev", "Deploy"] as const).map((tab) => (
                   <button
                     key={tab}
                     type="button"
@@ -354,7 +426,10 @@ export function Hero() {
 
           {/* ---------- RIGHT: IMAGE ---------- */}
 
-          <div ref={imageRef} className="flex justify-center md:justify-end">
+          <div
+            ref={imageRef}
+            className="flex justify-center md:justify-end opacity-0 will-change-transform"
+          >
             <div className="relative w-full max-w-sm md:max-w-md aspect-square rounded-2xl overflow-hidden shadow-xl">
               <Image
                 src="/brand-icon.png"
@@ -416,6 +491,8 @@ export function Hero() {
 
 /* ================================================= */
 /* SCALED STAGE                                      */
+/* Measures BEFORE first paint (layout effect), so   */
+/* there is no 1x -> scaled "shrink" jump on load.   */
 /* ================================================= */
 
 function ScaledStage({
@@ -428,12 +505,13 @@ function ScaledStage({
   const wrapRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
 
-  useEffect(() => {
+  useIsoLayoutEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
 
     const update = () => {
-      setScale(Math.min(1, el.clientWidth / STAGE_W));
+      const next = Math.min(1, el.clientWidth / STAGE_W);
+      setScale((prev) => (Math.abs(prev - next) < 0.001 ? prev : next));
     };
 
     update();
@@ -597,44 +675,52 @@ function Diagram({
 /* ================================================= */
 
 function ArchitectureNode({ node }: { node: DiagramNode }) {
-  const { title, subtitle, x, y, highlighted } = node;
+  const { title, subtitle, x, y, highlighted, tone } = node;
+
+  const [r, g, b] = TONES[tone];
+  const rgba = (a: number) => `rgba(${r}, ${g}, ${b}, ${a})`;
+
+  // Highlighted cards are stronger; normal cards are lighter but still coloured
+  const style: React.CSSProperties = {
+    width: NODE_W,
+    height: NODE_H,
+    left: x - NODE_W / 2,
+    top: y - NODE_H / 2,
+    background: highlighted
+      ? `linear-gradient(135deg, ${rgba(0.4)}, ${rgba(0.16)})`
+      : `linear-gradient(135deg, ${rgba(0.24)}, ${rgba(0.09)})`,
+    borderColor: highlighted ? rgba(0.95) : rgba(0.6),
+    boxShadow: highlighted
+      ? `0 0 22px ${rgba(0.35)}, inset 0 0 0 1px ${rgba(0.15)}`
+      : `0 0 12px ${rgba(0.15)}`,
+  };
 
   return (
     <div
-      className={`
-        absolute z-10
+      className="
+        group absolute z-10
         flex flex-col justify-center
         px-3
-        rounded-lg border backdrop-blur-md
-        transition-colors duration-300
-        hover:border-accent
-        ${
-          highlighted
-            ? "border-accent/50 bg-accent/5 shadow-[0_0_25px_rgba(0,0,0,0.08)]"
-            : "border-border/60 bg-card/70"
-        }
-      `}
-      style={{
-        width: NODE_W,
-        height: NODE_H,
-        left: x - NODE_W / 2,
-        top: y - NODE_H / 2,
-      }}
+        rounded-lg border-2 backdrop-blur-md
+        transition-all duration-300
+        hover:scale-[1.04]
+      "
+      style={style}
     >
       <div className="flex items-center gap-2">
         <span
-          className={`block w-1.5 h-1.5 rounded-full shrink-0 ${
-            highlighted
-              ? "bg-accent shadow-[0_0_8px_currentColor]"
-              : "bg-muted-foreground/50"
-          }`}
+          className="block w-2 h-2 rounded-full shrink-0"
+          style={{
+            backgroundColor: rgba(1),
+            boxShadow: `0 0 8px ${rgba(0.9)}`,
+          }}
         />
-        <span className="text-[15px] font-medium text-foreground whitespace-nowrap">
+        <span className="text-[15px] font-semibold text-foreground whitespace-nowrap">
           {title}
         </span>
       </div>
 
-      <div className="mt-1 ml-3.5 text-[11px] text-muted-foreground whitespace-nowrap">
+      <div className="mt-1 ml-4 text-[11px] text-foreground/70 whitespace-nowrap">
         {subtitle}
       </div>
     </div>

@@ -1225,7 +1225,7 @@ export function Navbar() {
       </nav>
 
       {/* ========================================================
-          FULL-WIDTH DEVELOPER IDENTITY BAR
+          FULL-WIDTH DEVELOPER IDENTITY BAR  (MOBILE FIXED)
       ======================================================== */}
 
       <div
@@ -1260,7 +1260,7 @@ export function Navbar() {
           className="
             w-full
 
-            min-h-[40px]
+            min-h-[44px]
 
             flex
 
@@ -1275,6 +1275,8 @@ export function Navbar() {
             backdrop-blur-2xl
 
             shadow-[0_8px_30px_rgba(0,0,0,0.15)]
+
+            pt-[env(safe-area-inset-top)]
           "
         >
 
@@ -1286,9 +1288,9 @@ export function Navbar() {
 
               items-center
 
-              justify-center
+              gap-3
 
-              px-4
+              px-3
 
               sm:px-6
 
@@ -1298,7 +1300,7 @@ export function Navbar() {
             "
           >
 
-            {/* Left / Center Content */}
+            {/* Left Content (min-w-0 lets text shrink/truncate) */}
 
             <div
               className="
@@ -1310,9 +1312,7 @@ export function Navbar() {
 
                 flex-1
 
-                justify-center
-
-                lg:justify-start
+                justify-start
 
                 max-w-7xl
               "
@@ -1372,33 +1372,73 @@ export function Navbar() {
                 />
               </span>
 
-              {/* Identity */}
+              {/* Identity:
+                  mobile  -> name on top, role below (truncates if too narrow)
+                  sm+     -> single line: name • role */}
 
-              <p
+              <div
                 className="
-                  text-md
+                  flex
 
-                  sm:text-sm
+                  flex-col
 
-                  font-large
+                  sm:flex-row
 
-                  text-foreground
+                  sm:items-center
 
-                  whitespace-nowrap
+                  min-w-0
+
+                  leading-tight
                 "
               >
-                <span className="text-accent font-semibold">
+                <span
+                  className="
+                    text-sm
+
+                    font-semibold
+
+                    text-accent
+
+                    whitespace-nowrap
+                  "
+                >
                   Vimal PK
                 </span>
 
-                <span className="text-muted-foreground mx-2">
+                <span
+                  className="
+                    hidden
+
+                    sm:inline
+
+                    text-muted-foreground
+
+                    mx-2
+                  "
+                >
                   •
                 </span>
 
-                <span className="text-foreground/80">
+                <span
+                  className="
+                    block
+
+                    mt-0.5
+
+                    sm:mt-0
+
+                    text-[11px]
+
+                    sm:text-sm
+
+                    text-foreground/80
+
+                    truncate
+                  "
+                >
                   AI-Based Passionate Full-Stack Developer
                 </span>
-              </p>
+              </div>
 
               {/* =================================================
                   DESKTOP ONLY CONTACT DETAILS
@@ -1415,6 +1455,8 @@ export function Navbar() {
                   ml-8
 
                   gap-5
+
+                  flex-shrink-0
                 "
               >
 
@@ -1496,7 +1538,7 @@ export function Navbar() {
             </div>
 
             {/* =================================================
-                CLOSE BUTTON
+                CLOSE BUTTON (always visible, never squeezed)
             ================================================= */}
 
             <button
@@ -1516,8 +1558,6 @@ export function Navbar() {
                 w-8
 
                 h-8
-
-                ml-3
 
                 rounded-lg
 
