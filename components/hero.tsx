@@ -4,16 +4,235 @@ import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import Image from "next/image";
 
+type ArchitectureTab = "dev" | "infra";
+
+const TECH_STACK = [
+  "Node.js",
+  "Next.js",
+  "React",
+  "REST APIs",
+  "JWT",
+  "Google IDP",
+  "MySQL",
+  "Redis",
+  "Prisma ORM",
+  "Docker",
+  "Kubernetes",
+  "Webhooks",
+  "Razorpay",
+  "Git",
+  "PM2",
+  "Nginx",
+  "SSL",
+];
+
+/* =========================================
+   DIAGRAM CONSTANTS
+   Nodes + lines share ONE 600 x 540
+   coordinate space, scaled to fit.
+========================================= */
+
+const STAGE_W = 600;
+const STAGE_H = 540;
+const NODE_W = 156;
+const NODE_H = 60;
+
+/** Dot speed in stage px / second (same for every line) */
+const DOT_SPEED = 70;
+/** Approx. seconds between consecutive dots on the same line */
+const DOT_SPACING_SECONDS = 1.8;
+
+type Side = "top" | "bottom" | "left" | "right";
+
+type DiagramNode = {
+  id: string;
+  title: string;
+  subtitle: string;
+  x: number;
+  y: number;
+  highlighted?: boolean;
+};
+
+type DiagramEdge = {
+  from: string;
+  to: string;
+  fromSide: Side;
+  toSide: Side;
+  fromOff?: number;
+  toOff?: number;
+};
+
+/* =========================================
+   DEV DIAGRAM DATA
+========================================= */
+
+const DEV_NODES: DiagramNode[] = [
+  // Left column
+  { id: "mysql", title: "MySQL", subtitle: "Database", x: 90, y: 45 },
+  { id: "redis", title: "Redis", subtitle: "Cache", x: 90, y: 205 },
+  { id: "google", title: "Google IDP", subtitle: "Identity Provider", x: 90, y: 375, highlighted: true },
+
+  // Center column
+  { id: "prisma", title: "Prisma ORM", subtitle: "Data Layer", x: 300, y: 130, highlighted: true },
+  { id: "api", title: "REST APIs", subtitle: "Node.js / Express", x: 300, y: 290, highlighted: true },
+  { id: "react", title: "React / Next.js", subtitle: "Frontend", x: 300, y: 460, highlighted: true },
+
+  // Right column
+  { id: "hfproxy", title: "HF Proxy", subtitle: "Model Gateway", x: 510, y: 45 },
+  { id: "jwt", title: "JWT", subtitle: "Authentication", x: 510, y: 205 },
+  { id: "webhooks", title: "Webhooks", subtitle: "3rd Party", x: 510, y: 290 },
+  { id: "payment", title: "Payment Gateway", subtitle: "External Service", x: 510, y: 375 },
+];
+
+const DEV_EDGES: DiagramEdge[] = [
+  { from: "mysql", to: "prisma", fromSide: "right", toSide: "left", toOff: -10 },
+  { from: "redis", to: "prisma", fromSide: "right", toSide: "left", toOff: 10 },
+  { from: "hfproxy", to: "prisma", fromSide: "left", toSide: "right" },
+  { from: "prisma", to: "api", fromSide: "bottom", toSide: "top" },
+  { from: "jwt", to: "api", fromSide: "left", toSide: "top", toOff: 45 },
+  { from: "webhooks", to: "api", fromSide: "left", toSide: "right" },
+  { from: "payment", to: "api", fromSide: "left", toSide: "bottom", toOff: 45 },
+  { from: "google", to: "api", fromSide: "right", toSide: "left", toOff: 12 },
+  { from: "api", to: "redis", fromSide: "left", toSide: "bottom", fromOff: -12 },
+  { from: "api", to: "react", fromSide: "bottom", toSide: "top" },
+];
+
+/* =========================================
+   INFRA DIAGRAM DATA
+========================================= */
+
+const INFRA_NODES: DiagramNode[] = [
+  { id: "source", title: "Development", subtitle: "Source Code", x: 300, y: 40, highlighted: true },
+
+  // Server deployment (left)
+  { id: "clone", title: "Git Clone", subtitle: "Server Checkout", x: 95, y: 145 },
+  { id: "ubuntu", title: "Ubuntu Server", subtitle: "VM / Linux", x: 95, y: 230, highlighted: true },
+  { id: "pm2", title: "PM2", subtitle: "Process Manager", x: 95, y: 315, highlighted: true },
+  { id: "nginx", title: "Nginx / SSL", subtitle: "Reverse Proxy", x: 95, y: 400 },
+
+  // Kubernetes deployment (right)
+  { id: "yaml", title: "K8s YAML", subtitle: "Deployment Manifests", x: 505, y: 145 },
+  { id: "master", title: "Kube Master", subtitle: "Control Plane", x: 505, y: 230, highlighted: true },
+  { id: "service", title: "K8s Service", subtitle: "Cluster Service", x: 505, y: 315, highlighted: true },
+  { id: "ingress", title: "NodePort / Ingress", subtitle: "External Entry Point", x: 505, y: 400 },
+
+  // Shared
+  { id: "app", title: "Application", subtitle: "Node.js Service", x: 300, y: 485, highlighted: true },
+];
+
+const INFRA_EDGES: DiagramEdge[] = [
+  // Source branches
+  { from: "source", to: "clone", fromSide: "bottom", toSide: "right", fromOff: -40 },
+  { from: "source", to: "yaml", fromSide: "bottom", toSide: "left", fromOff: 40 },
+
+  // Server flow
+  { from: "clone", to: "ubuntu", fromSide: "bottom", toSide: "top" },
+  { from: "ubuntu", to: "pm2", fromSide: "bottom", toSide: "top" },
+  { from: "pm2", to: "nginx", fromSide: "bottom", toSide: "top" },
+  { from: "nginx", to: "app", fromSide: "bottom", toSide: "left" },
+
+  // Kubernetes flow
+  { from: "yaml", to: "master", fromSide: "bottom", toSide: "top" },
+  { from: "master", to: "service", fromSide: "bottom", toSide: "top" },
+  { from: "service", to: "ingress", fromSide: "bottom", toSide: "top" },
+  { from: "ingress", to: "app", fromSide: "bottom", toSide: "right" },
+];
+
+/* =========================================
+   GEOMETRY HELPERS
+========================================= */
+
+function anchorPoint(
+  n: DiagramNode,
+  side: Side,
+  off = 0
+): [number, number] {
+  switch (side) {
+    case "top":
+      return [n.x + off, n.y - NODE_H / 2];
+    case "bottom":
+      return [n.x + off, n.y + NODE_H / 2];
+    case "left":
+      return [n.x - NODE_W / 2, n.y + off];
+    case "right":
+      return [n.x + NODE_W / 2, n.y + off];
+  }
+}
+
+const NORMALS: Record<Side, [number, number]> = {
+  top: [0, -1],
+  bottom: [0, 1],
+  left: [-1, 0],
+  right: [1, 0],
+};
+
+/** Builds a cubic bezier path and measures its real length. */
+function buildPath(
+  a: DiagramNode,
+  b: DiagramNode,
+  edge: DiagramEdge
+): { d: string; length: number } {
+  const [x1, y1] = anchorPoint(a, edge.fromSide, edge.fromOff ?? 0);
+  const [x2, y2] = anchorPoint(b, edge.toSide, edge.toOff ?? 0);
+
+  const dist = Math.hypot(x2 - x1, y2 - y1);
+  const k = Math.max(20, Math.min(80, dist * 0.45));
+
+  const [n1x, n1y] = NORMALS[edge.fromSide];
+  const [n2x, n2y] = NORMALS[edge.toSide];
+
+  const c1x = x1 + n1x * k;
+  const c1y = y1 + n1y * k;
+  const c2x = x2 + n2x * k;
+  const c2y = y2 + n2y * k;
+
+  // approximate bezier length by sampling
+  const steps = 40;
+  let length = 0;
+  let px = x1;
+  let py = y1;
+
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    const u = 1 - t;
+
+    const x =
+      u * u * u * x1 +
+      3 * u * u * t * c1x +
+      3 * u * t * t * c2x +
+      t * t * t * x2;
+
+    const y =
+      u * u * u * y1 +
+      3 * u * u * t * c1y +
+      3 * u * t * t * c2y +
+      t * t * t * y2;
+
+    length += Math.hypot(x - px, y - py);
+    px = x;
+    py = y;
+  }
+
+  return {
+    d: `M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`,
+    length,
+  };
+}
+
+/* =========================================
+   HERO
+========================================= */
+
 export function Hero() {
   const containerRef = useRef<HTMLDivElement>(null);
   const architectureRef = useRef<HTMLDivElement>(null);
+  const stageOuterRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLDivElement>(null);
 
   const [isHovering, setIsHovering] = useState(false);
+  const [activeTab, setActiveTab] = useState<ArchitectureTab>("dev");
 
-  /* ========================================= */
-  /* HERO ANIMATION                            */
-  /* ========================================= */
+  /* ---------- HERO ENTRY ANIMATION ---------- */
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -36,6 +255,18 @@ export function Hero() {
     return () => ctx.revert();
   }, []);
 
+  /* ---------- TAB TRANSITION (diagram only) ---------- */
+
+  useEffect(() => {
+    if (!stageOuterRef.current) return;
+
+    gsap.fromTo(
+      stageOuterRef.current,
+      { opacity: 0.65, y: 8 },
+      { opacity: 1, y: 0, duration: 0.35, ease: "power2.out" }
+    );
+  }, [activeTab]);
+
   return (
     <section
       id="home"
@@ -43,422 +274,67 @@ export function Hero() {
       className="pt-[90px] pb-[10px] px-6 min-h-screen flex items-center"
     >
       <div className="max-w-6xl mx-auto w-full">
-
-        {/* ========================================= */}
-        {/* MAIN HERO                                 */}
-        {/* ========================================= */}
+        {/* ================= MAIN HERO ================= */}
 
         <div className="grid md:grid-cols-2 gap-10 md:gap-12 items-center">
+          {/* ---------- LEFT: ARCHITECTURE MAP ---------- */}
 
-          {/* ========================================= */}
-          {/* LEFT - ARCHITECTURE MAP                  */}
-          {/* ========================================= */}
-
-          <div
-            ref={architectureRef}
-            className="relative w-full h-[500px] md:h-[540px] overflow-hidden"
-          >
-
-            {/* ========================================= */}
-            {/* BACKGROUND GLOW                          */}
-            {/* ========================================= */}
-
-            <div className="absolute inset-0 pointer-events-none">
-
+          <div ref={architectureRef} className="relative w-full">
+            {/* Background glow */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
               <div className="absolute top-[20%] left-[25%] w-40 h-40 bg-accent/5 rounded-full blur-3xl" />
-
               <div className="absolute bottom-[15%] right-[15%] w-52 h-52 bg-accent/5 rounded-full blur-3xl" />
-
             </div>
 
-
-            {/* ========================================= */}
-            {/* SVG CONNECTIONS                           */}
-            {/* ========================================= */}
-
-            <svg
-              className="absolute inset-0 w-full h-full pointer-events-none"
-              viewBox="0 0 600 540"
-              preserveAspectRatio="xMidYMid meet"
-            >
-
-              <defs>
-
-                {/* =============================== */}
-                {/* DATABASE → PRISMA                */}
-                {/* =============================== */}
-
-                <path
-                  id="mysql-prisma"
-                  d="M 95 70 C 160 70, 190 130, 270 150"
-                  fill="none"
-                />
-
-                <path
-                  id="redis-prisma"
-                  d="M 95 245 C 170 245, 190 175, 270 150"
-                  fill="none"
-                />
-
-
-                {/* =============================== */}
-                {/* PRISMA → API                     */}
-                {/* =============================== */}
-
-                <path
-                  id="prisma-api"
-                  d="M 300 175 L 300 265"
-                  fill="none"
-                />
-
-
-                {/* =============================== */}
-                {/* GOOGLE IDP → REST API            */}
-                {/* =============================== */}
-
-                <path
-                  id="google-api"
-                  d="M 100 425 C 150 400, 220 350, 285 300"
-                  fill="none"
-                />
-
-
-                {/* =============================== */}
-                {/* JWT → API                        */}
-                {/* =============================== */}
-
-                <path
-                  id="jwt-api"
-                  d="M 440 245 C 400 245, 380 285, 335 285"
-                  fill="none"
-                />
-
-
-                {/* =============================== */}
-                {/* API → REACT                      */}
-                {/* =============================== */}
-
-                <path
-                  id="api-react"
-                  d="M 300 315 L 300 410"
-                  fill="none"
-                />
-
-
-                {/* =============================== */}
-                {/* WEBHOOKS → API                   */}
-                {/* =============================== */}
-
-                <path
-                  id="webhooks-api"
-                  d="M 480 95 C 470 150, 410 220, 340 275"
-                  fill="none"
-                />
-
-
-                {/* =============================== */}
-                {/* PAYMENT → API                    */}
-                {/* =============================== */}
-
-                <path
-                  id="payment-api"
-                  d="M 500 390 C 455 390, 410 330, 340 300"
-                  fill="none"
-                />
-
-
-                {/* =============================== */}
-                {/* API → REDIS                      */}
-                {/* =============================== */}
-
-                <path
-                  id="api-redis"
-                  d="M 270 300 C 210 325, 150 300, 95 265"
-                  fill="none"
-                />
-
-              </defs>
-
-
-              {/* ================================= */}
-              {/* DOTTED CONNECTION LINES            */}
-              {/* ================================= */}
-
-              <g
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeDasharray="4 7"
-                className="text-muted-foreground/30"
-              >
-
-                <use href="#mysql-prisma" />
-
-                <use href="#redis-prisma" />
-
-                <use href="#prisma-api" />
-
-                {/* Google IDP → REST API */}
-                <use href="#google-api" />
-
-                <use href="#jwt-api" />
-
-                <use href="#api-react" />
-
-                <use href="#webhooks-api" />
-
-                <use href="#payment-api" />
-
-                <use href="#api-redis" />
-
-              </g>
-
-
-              {/* ================================= */}
-              {/* ANIMATED DATA DOTS                */}
-              {/* ================================= */}
-
-              <g>
-
-                {/* MySQL → Prisma */}
-
-                <circle r="3" className="fill-accent">
-                  <animateMotion
-                    dur="2.8s"
-                    repeatCount="indefinite"
+            {/* DEV / INFRA TABS */}
+            <div className="relative z-40 mb-4 flex">
+              <div className="flex items-center p-1 rounded-lg border border-border/60 bg-card/80 backdrop-blur-md">
+                {(["dev", "infra"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-5 py-2 rounded-md text-xs font-medium transition-all duration-300 ${
+                      activeTab === tab
+                        ? "bg-accent text-accent-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
                   >
-                    <mpath href="#mysql-prisma" />
-                  </animateMotion>
-                </circle>
-
-
-                {/* Redis → Prisma */}
-
-                <circle r="3" className="fill-accent">
-                  <animateMotion
-                    dur="3.2s"
-                    begin="0.7s"
-                    repeatCount="indefinite"
-                  >
-                    <mpath href="#redis-prisma" />
-                  </animateMotion>
-                </circle>
-
-
-                {/* Prisma → API */}
-
-                <circle r="3" className="fill-accent">
-                  <animateMotion
-                    dur="2s"
-                    begin="0.4s"
-                    repeatCount="indefinite"
-                  >
-                    <mpath href="#prisma-api" />
-                  </animateMotion>
-                </circle>
-
-
-                {/* ================================= */}
-                {/* GOOGLE IDP → REST API              */}
-                {/* ================================= */}
-
-                <circle r="3" className="fill-accent">
-                  <animateMotion
-                    dur="3s"
-                    begin="0.6s"
-                    repeatCount="indefinite"
-                  >
-                    <mpath href="#google-api" />
-                  </animateMotion>
-                </circle>
-
-
-                {/* JWT → API */}
-
-                <circle r="3" className="fill-accent">
-                  <animateMotion
-                    dur="2.5s"
-                    begin="1s"
-                    repeatCount="indefinite"
-                  >
-                    <mpath href="#jwt-api" />
-                  </animateMotion>
-                </circle>
-
-
-                {/* API → React */}
-
-                <circle r="3" className="fill-accent">
-                  <animateMotion
-                    dur="2.3s"
-                    begin="0.3s"
-                    repeatCount="indefinite"
-                  >
-                    <mpath href="#api-react" />
-                  </animateMotion>
-                </circle>
-
-
-                {/* Webhooks → API */}
-
-                <circle r="3" className="fill-accent">
-                  <animateMotion
-                    dur="3.5s"
-                    begin="1.2s"
-                    repeatCount="indefinite"
-                  >
-                    <mpath href="#webhooks-api" />
-                  </animateMotion>
-                </circle>
-
-
-                {/* Payment Gateway → API */}
-
-                <circle r="3" className="fill-accent">
-                  <animateMotion
-                    dur="3s"
-                    begin="0.8s"
-                    repeatCount="indefinite"
-                  >
-                    <mpath href="#payment-api" />
-                  </animateMotion>
-                </circle>
-
-
-                {/* API → Redis */}
-
-                <circle r="3" className="fill-accent">
-                  <animateMotion
-                    dur="3.4s"
-                    begin="1.4s"
-                    repeatCount="indefinite"
-                  >
-                    <mpath href="#api-redis" />
-                  </animateMotion>
-                </circle>
-
-              </g>
-
-            </svg>
-
-
-            {/* ========================================= */}
-            {/* ARCHITECTURE NODES                        */}
-            {/* ========================================= */}
-
-            {/* MySQL */}
-
-            <ArchitectureNode
-              title="MySQL/MongoDB"
-              subtitle="Database"
-              className="left-[4%] top-[7%]"
-            />
-
-
-            {/* Redis */}
-
-            <ArchitectureNode
-              title="Redis"
-              subtitle="Cache"
-              className="left-[4%] top-[39%]"
-            />
-
-
-            {/* Prisma */}
-
-            <ArchitectureNode
-              title="Prisma ORM"
-              subtitle="Data Layer"
-              className="left-[40%] top-[22%]"
-              highlighted
-            />
-
-
-            {/* ========================================= */}
-            {/* GOOGLE IDP - MOVED TO BOTTOM LEFT        */}
-            {/* ========================================= */}
-
-            <ArchitectureNode
-              title="Google IDP"
-              subtitle="Identity Provider"
-              className="left-[4%] top-[69%]"
-              highlighted
-            />
-
-
-            {/* JWT */}
-
-            <ArchitectureNode
-              title="JWT"
-              subtitle="Authentication"
-              className="left-[68%] top-[39%]"
-            />
-
-
-            {/* Webhooks */}
-
-            <ArchitectureNode
-              title="Webhooks"
-              subtitle="3rd Party"
-              className="left-[73%] top-[7%]"
-            />
-
-
-            {/* REST APIs */}
-
-            <ArchitectureNode
-              title="REST APIs"
-              subtitle="Node.js / Express"
-              className="left-[39%] top-[50%]"
-              highlighted
-            />
-
-
-            {/* Payment Gateway */}
-
-            <ArchitectureNode
-              title="Payment Gateway"
-              subtitle="External Service"
-              className="left-[68%] top-[69%]"
-            />
-
-
-            {/* React */}
-
-            <ArchitectureNode
-              title="React / Next.js"
-              subtitle="Frontend"
-              className="left-[39%] top-[78%]"
-              highlighted
-            />
-
-
-            {/* ========================================= */}
-            {/* LABEL                                    */}
-            {/* ========================================= */}
-
-            <div className="absolute left-1/2 -translate-x-1/2 bottom-0">
-
-              <div className="text-[10px] md:text-xs text-muted-foreground/60 font-mono tracking-widest whitespace-nowrap">
-                MY DEV APPLICATION ARCHITECTURE
+                    {tab.toUpperCase()}
+                  </button>
+                ))}
               </div>
-
             </div>
 
+            {/* DIAGRAM */}
+            <ScaledStage outerRef={stageOuterRef}>
+              {activeTab === "dev" ? (
+                <Diagram
+                  key="dev"
+                  prefix="dev"
+                  nodes={DEV_NODES}
+                  edges={DEV_EDGES}
+                  label="APPLICATION ARCHITECTURE"
+                />
+              ) : (
+                <Diagram
+                  key="infra"
+                  prefix="infra"
+                  nodes={INFRA_NODES}
+                  edges={INFRA_EDGES}
+                  label="INFRASTRUCTURE / DEPLOYMENT"
+                >
+                  <ColumnLabel text="SERVER DEPLOYMENT" x={95} y={100} />
+                  <ColumnLabel text="KUBERNETES DEPLOYMENT" x={505} y={100} />
+                </Diagram>
+              )}
+            </ScaledStage>
           </div>
 
+          {/* ---------- RIGHT: IMAGE ---------- */}
 
-          {/* ========================================= */}
-          {/* RIGHT - IMAGE                             */}
-          {/* ========================================= */}
-
-          <div
-            ref={imageRef}
-            className="flex justify-center md:justify-end"
-          >
-
+          <div ref={imageRef} className="flex justify-center md:justify-end">
             <div className="relative w-full max-w-sm md:max-w-md aspect-square rounded-2xl overflow-hidden shadow-xl">
-
               <Image
                 src="https://aortepjbbvixlgouowra.supabase.co/storage/v1/object/public/vimal-official/brand-icon.png"
                 alt="Vimal - Full-Stack Developer"
@@ -467,205 +343,312 @@ export function Hero() {
                 className="object-cover"
                 sizes="(max-width: 768px) 80vw, 400px"
               />
-
             </div>
-
           </div>
-
         </div>
 
-
-        {/* ========================================= */}
-        {/* TECH STACK                                */}
-        {/* ========================================= */}
+        {/* ================= TECH STACK ================= */}
 
         <div className="mt-10 w-full">
-
           <div className="text-center mb-5">
-
             <span className="text-sm text-muted-foreground font-medium">
               Tech Stack
             </span>
-
           </div>
 
-
-          {/* Desktop */}
-
+          {/* DESKTOP */}
           <div className="hidden md:flex flex-wrap gap-3 justify-center mb-4">
-
-            {[
-              "Node.js",
-              "Next.js",
-              "React",
-              "REST APIs",
-              "JWT",
-              "Google IDP",
-              "MySQL",
-              "Redis",
-              "Prisma ORM",
-              "Docker",
-              "Kubernetes",
-              "Webhooks",
-              "Razorpay",
-              "Git",
-              "SSL",
-            ].map((tech) => (
-
+            {TECH_STACK.map((tech) => (
               <div
                 key={tech}
                 className="px-4 py-1.5 bg-card border border-border rounded-md text-xs text-muted-foreground"
               >
                 {tech}
               </div>
-
             ))}
-
           </div>
 
-
-          {/* Mobile */}
-
+          {/* MOBILE MARQUEE */}
           <div
             className="md:hidden overflow-hidden"
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
           >
-
             <div
               className="flex gap-4 whitespace-nowrap"
               style={{
                 animation: "marquee 14s linear infinite",
-                animationPlayState: isHovering
-                  ? "paused"
-                  : "running",
+                animationPlayState: isHovering ? "paused" : "running",
               }}
             >
-
-              {[
-                "Node.js",
-                "Next.js",
-                "React",
-                "REST APIs",
-                "JWT",
-                "Google IDP",
-                "MySQL",
-                "Redis",
-                "Prisma ORM",
-                "Docker",
-                "Kubernetes",
-                "Webhooks",
-                "Razorpay",
-                "Git",
-                "SSL",
-
-                "Node.js",
-                "Next.js",
-                "React",
-                "REST APIs",
-                "JWT",
-                "Google IDP",
-                "MySQL",
-                "Redis",
-                "Prisma ORM",
-                "Docker",
-                "Kubernetes",
-                "Webhooks",
-                "Razorpay",
-                "Git",
-                "SSL",
-              ].map((tech, index) => (
-
+              {[...TECH_STACK, ...TECH_STACK].map((tech, index) => (
                 <div
                   key={index}
                   className="px-4 py-1.5 bg-card border border-border rounded-md text-xs text-muted-foreground flex-shrink-0"
                 >
                   {tech}
                 </div>
-
               ))}
-
             </div>
-
           </div>
-
         </div>
-
       </div>
     </section>
   );
 }
 
+/* ================================================= */
+/* SCALED STAGE                                      */
+/* ================================================= */
 
-/* ========================================= */
-/* ARCHITECTURE NODE                         */
-/* ========================================= */
-
-function ArchitectureNode({
-  title,
-  subtitle,
-  className,
-  highlighted = false,
+function ScaledStage({
+  children,
+  outerRef,
 }: {
-  title: string;
-  subtitle: string;
-  className?: string;
-  highlighted?: boolean;
+  children: React.ReactNode;
+  outerRef: React.RefObject<HTMLDivElement | null>;
 }) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+
+    const update = () => {
+      setScale(Math.min(1, el.clientWidth / STAGE_W));
+    };
+
+    update();
+
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div ref={outerRef} className="w-full">
+      <div
+        ref={wrapRef}
+        className="relative w-full"
+        style={{ height: STAGE_H * scale }}
+      >
+        <div
+          className="absolute top-0 left-1/2"
+          style={{
+            width: STAGE_W,
+            height: STAGE_H,
+            transform: `translateX(-50%) scale(${scale})`,
+            transformOrigin: "top center",
+          }}
+        >
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ================================================= */
+/* DIAGRAM                                           */
+/* ================================================= */
+
+type FlowDot = {
+  key: string;
+  pathId: string;
+  dur: number;
+  begin: number;
+};
+
+function Diagram({
+  prefix,
+  nodes,
+  edges,
+  label,
+  children,
+}: {
+  prefix: string;
+  nodes: DiagramNode[];
+  edges: DiagramEdge[];
+  label: string;
+  children?: React.ReactNode;
+}) {
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+
+  /* ---- 1. build paths + measure real lengths ---- */
+
+  const paths = edges
+    .map((edge, i) => {
+      const a = nodeMap.get(edge.from);
+      const b = nodeMap.get(edge.to);
+      if (!a || !b) return null;
+
+      const { d, length } = buildPath(a, b, edge);
+
+      return {
+        id: `${prefix}-edge-${i}`,
+        d,
+        travel: length / DOT_SPEED, // seconds to travel the full line
+      };
+    })
+    .filter(Boolean) as { id: string; d: string; travel: number }[];
+
+  /* ---- 2. every line gets its OWN independent, endless loop ----
+     - dur = that line's travel time  -> same speed on every line
+     - several dots per line, evenly staggered with a negative
+       begin so the flow is already running on the first frame
+     - no shared cycle, so no line ever waits for another one */
+
+  const dots: FlowDot[] = [];
+
+  paths.forEach((p, pi) => {
+    const count = Math.max(1, Math.round(p.travel / DOT_SPACING_SECONDS));
+    const gap = p.travel / count;
+    // small per-line offset so lines don't all pulse in sync
+    const lineOffset = (pi * 0.37) % gap;
+
+    for (let j = 0; j < count; j++) {
+      dots.push({
+        key: `${p.id}-dot-${j}`,
+        pathId: p.id,
+        dur: p.travel,
+        begin: -(j * gap + lineOffset),
+      });
+    }
+  });
+
+  return (
+    <div className="absolute inset-0">
+      {/* LINES + FLOWING DOTS */}
+      <svg
+        className="absolute inset-0 w-full h-full pointer-events-none"
+        viewBox={`0 0 ${STAGE_W} ${STAGE_H}`}
+      >
+        <g
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeDasharray="4 7"
+          className="text-muted-foreground/30"
+        >
+          {paths.map((p) => (
+            <path key={p.id} id={p.id} d={p.d} />
+          ))}
+        </g>
+
+        <g>
+          {dots.map((dot) => (
+            <circle key={dot.key} r="3" className="fill-accent" opacity="0">
+              <animateMotion
+                dur={`${dot.dur}s`}
+                begin={`${dot.begin}s`}
+                repeatCount="indefinite"
+                calcMode="linear"
+              >
+                <mpath href={`#${dot.pathId}`} />
+              </animateMotion>
+
+              {/* soft fade in at the start / fade out at the end of the line */}
+              <animate
+                attributeName="opacity"
+                dur={`${dot.dur}s`}
+                begin={`${dot.begin}s`}
+                repeatCount="indefinite"
+                values="0;1;1;0"
+                keyTimes="0;0.08;0.92;1"
+              />
+            </circle>
+          ))}
+        </g>
+      </svg>
+
+      {/* NODES */}
+      {nodes.map((n) => (
+        <ArchitectureNode key={n.id} node={n} />
+      ))}
+
+      {children}
+
+      {/* BOTTOM LABEL */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 text-[11px] text-muted-foreground/60 font-mono tracking-widest whitespace-nowrap"
+        style={{ top: STAGE_H - 22 }}
+      >
+        {label}
+      </div>
+    </div>
+  );
+}
+
+/* ================================================= */
+/* ARCHITECTURE NODE                                 */
+/* ================================================= */
+
+function ArchitectureNode({ node }: { node: DiagramNode }) {
+  const { title, subtitle, x, y, highlighted } = node;
+
   return (
     <div
       className={`
-        absolute
-        ${className}
-        z-10
-        min-w-[100px]
-        md:min-w-[125px]
+        absolute z-10
+        flex flex-col justify-center
         px-3
-        py-2.5
-        rounded-lg
-        border
-        backdrop-blur-md
-        transition-all
-        duration-300
-        hover:scale-105
-
+        rounded-lg border backdrop-blur-md
+        transition-colors duration-300
+        hover:border-accent
         ${
           highlighted
             ? "border-accent/50 bg-accent/5 shadow-[0_0_25px_rgba(0,0,0,0.08)]"
             : "border-border/60 bg-card/70"
         }
       `}
+      style={{
+        width: NODE_W,
+        height: NODE_H,
+        left: x - NODE_W / 2,
+        top: y - NODE_H / 2,
+      }}
     >
-
       <div className="flex items-center gap-2">
-
         <span
-          className={`
-            block
-            w-1.5
-            h-1.5
-            rounded-full
-            shrink-0
-
-            ${
-              highlighted
-                ? "bg-accent shadow-[0_0_8px_currentColor]"
-                : "bg-muted-foreground/50"
-            }
-          `}
+          className={`block w-1.5 h-1.5 rounded-full shrink-0 ${
+            highlighted
+              ? "bg-accent shadow-[0_0_8px_currentColor]"
+              : "bg-muted-foreground/50"
+          }`}
         />
-
-        <span className="text-xs md:text-sm font-medium text-foreground whitespace-nowrap">
+        <span className="text-[15px] font-medium text-foreground whitespace-nowrap">
           {title}
         </span>
-
       </div>
 
-
-      <div className="mt-1 ml-3.5 text-[9px] md:text-[10px] text-muted-foreground whitespace-nowrap">
+      <div className="mt-1 ml-3.5 text-[11px] text-muted-foreground whitespace-nowrap">
         {subtitle}
       </div>
+    </div>
+  );
+}
 
+/* ================================================= */
+/* COLUMN LABEL (infra)                              */
+/* ================================================= */
+
+function ColumnLabel({
+  text,
+  x,
+  y,
+}: {
+  text: string;
+  x: number;
+  y: number;
+}) {
+  return (
+    <div
+      className="absolute -translate-x-1/2 -translate-y-1/2 z-20 text-[10px] font-mono tracking-[0.18em] text-muted-foreground/60 whitespace-nowrap"
+      style={{ left: x, top: y }}
+    >
+      {text}
     </div>
   );
 }
