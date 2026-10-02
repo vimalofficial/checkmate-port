@@ -26,6 +26,9 @@ const TECH_STACK = [
   "SSL",
 ];
 
+/** Seconds for one full marquee loop (higher = slower) */
+const MARQUEE_DURATION = 30;
+
 /* =========================================
    DIAGRAM CONSTANTS
    Nodes + lines share ONE 600 x 540
@@ -34,7 +37,7 @@ const TECH_STACK = [
 
 const STAGE_W = 600;
 const STAGE_H = 540;
-const NODE_W = 156;
+const NODE_W = 175;
 const NODE_H = 60;
 
 /** Dot speed in stage px / second (same for every line) */
@@ -68,7 +71,7 @@ type DiagramEdge = {
 
 const DEV_NODES: DiagramNode[] = [
   // Left column
-  { id: "mysql", title: "MySQL", subtitle: "Database", x: 90, y: 45 },
+  { id: "mysql", title: "MySQL/MongoDB", subtitle: "Database", x: 90, y: 45 },
   { id: "redis", title: "Redis", subtitle: "Cache", x: 90, y: 205 },
   { id: "google", title: "Google IDP", subtitle: "Identity Provider", x: 90, y: 375, highlighted: true },
 
@@ -117,7 +120,7 @@ const INFRA_NODES: DiagramNode[] = [
   { id: "ingress", title: "NodePort / Ingress", subtitle: "External Entry Point", x: 505, y: 400 },
 
   // Shared
-  { id: "app", title: "Application", subtitle: "Node.js Service", x: 300, y: 485, highlighted: true },
+  { id: "app", title: "Application", subtitle: "Frontend UI", x: 300, y: 485, highlighted: true },
 ];
 
 const INFRA_EDGES: DiagramEdge[] = [
@@ -229,7 +232,6 @@ export function Hero() {
   const stageOuterRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLDivElement>(null);
 
-  const [isHovering, setIsHovering] = useState(false);
   const [activeTab, setActiveTab] = useState<ArchitectureTab>("dev");
 
   /* ---------- HERO ENTRY ANIMATION ---------- */
@@ -273,6 +275,25 @@ export function Hero() {
       ref={containerRef}
       className="pt-[90px] pb-[10px] px-6 min-h-screen flex items-center"
     >
+      {/* Marquee keyframes + hover pause (self-contained, no global CSS needed) */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            @keyframes tech-marquee {
+              from { transform: translateX(0); }
+              to   { transform: translateX(-50%); }
+            }
+            .tech-marquee-track {
+              animation: tech-marquee ${MARQUEE_DURATION}s linear infinite;
+              will-change: transform;
+            }
+            .tech-marquee:hover .tech-marquee-track {
+              animation-play-state: paused;
+            }
+          `,
+        }}
+      />
+
       <div className="max-w-6xl mx-auto w-full">
         {/* ================= MAIN HERO ================= */}
 
@@ -336,7 +357,7 @@ export function Hero() {
           <div ref={imageRef} className="flex justify-center md:justify-end">
             <div className="relative w-full max-w-sm md:max-w-md aspect-square rounded-2xl overflow-hidden shadow-xl">
               <Image
-                src="https://aortepjbbvixlgouowra.supabase.co/storage/v1/object/public/vimal-official/brand-icon.png"
+                src="/brand-icon.png"
                 alt="Vimal - Full-Stack Developer"
                 fill
                 priority
@@ -356,37 +377,33 @@ export function Hero() {
             </span>
           </div>
 
-          {/* DESKTOP */}
-          <div className="hidden md:flex flex-wrap gap-3 justify-center mb-4">
-            {TECH_STACK.map((tech) => (
-              <div
-                key={tech}
-                className="px-4 py-1.5 bg-card border border-border rounded-md text-xs text-muted-foreground"
-              >
-                {tech}
-              </div>
-            ))}
-          </div>
-
-          {/* MOBILE MARQUEE */}
+          {/* MARQUEE: single line, clipped inside its own container,
+              always moving, pauses only on hover */}
           <div
-            className="md:hidden overflow-hidden"
-            onMouseEnter={() => setIsHovering(true)}
-            onMouseLeave={() => setIsHovering(false)}
+            className="tech-marquee relative w-full overflow-hidden rounded-xl border border-border/60 bg-card/40 py-3"
+            style={{
+              maskImage:
+                "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
+              WebkitMaskImage:
+                "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
+            }}
           >
-            <div
-              className="flex gap-4 whitespace-nowrap"
-              style={{
-                animation: "marquee 14s linear infinite",
-                animationPlayState: isHovering ? "paused" : "running",
-              }}
-            >
-              {[...TECH_STACK, ...TECH_STACK].map((tech, index) => (
+            <div className="tech-marquee-track flex w-max flex-nowrap">
+              {/* two identical groups -> seamless endless loop */}
+              {[0, 1].map((group) => (
                 <div
-                  key={index}
-                  className="px-4 py-1.5 bg-card border border-border rounded-md text-xs text-muted-foreground flex-shrink-0"
+                  key={group}
+                  className="flex flex-nowrap shrink-0"
+                  aria-hidden={group === 1}
                 >
-                  {tech}
+                  {TECH_STACK.map((tech) => (
+                    <div
+                      key={`${group}-${tech}`}
+                      className="mr-3 shrink-0 whitespace-nowrap px-4 py-1.5 bg-card border border-border rounded-md text-xs text-muted-foreground"
+                    >
+                      {tech}
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
@@ -494,18 +511,13 @@ function Diagram({
     })
     .filter(Boolean) as { id: string; d: string; travel: number }[];
 
-  /* ---- 2. every line gets its OWN independent, endless loop ----
-     - dur = that line's travel time  -> same speed on every line
-     - several dots per line, evenly staggered with a negative
-       begin so the flow is already running on the first frame
-     - no shared cycle, so no line ever waits for another one */
+  /* ---- 2. every line gets its OWN independent, endless loop ---- */
 
   const dots: FlowDot[] = [];
 
   paths.forEach((p, pi) => {
     const count = Math.max(1, Math.round(p.travel / DOT_SPACING_SECONDS));
     const gap = p.travel / count;
-    // small per-line offset so lines don't all pulse in sync
     const lineOffset = (pi * 0.37) % gap;
 
     for (let j = 0; j < count; j++) {
@@ -549,7 +561,6 @@ function Diagram({
                 <mpath href={`#${dot.pathId}`} />
               </animateMotion>
 
-              {/* soft fade in at the start / fade out at the end of the line */}
               <animate
                 attributeName="opacity"
                 dur={`${dot.dur}s`}
