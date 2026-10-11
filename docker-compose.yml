@@ -1,0 +1,27 @@
+
+services:
+  next1:
+    image: checkmate-port:v1
+    env_file:
+      - path: ./.env
+        required: false
+    expose:
+      - "3000"
+
+  next2:
+    image: checkmate-port:v1
+    env_file:
+      - path: ./.env
+        required: false
+    expose:
+      - "3000"
+
+  haproxy:
+    image: haproxy:3.2
+    ports:
+      - "8080:80"
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - next1
+      - next2
