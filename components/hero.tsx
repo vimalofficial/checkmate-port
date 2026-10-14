@@ -3,6 +3,7 @@
 import {
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -14,6 +15,51 @@ type ArchitectureTab = "dev" | "infra";
 /** useLayoutEffect on the client, useEffect on the server (no SSR warning) */
 const useIsoLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* =========================================
+   PAGE READY GATE
+   Starts animations only after: window load + fonts + 2 clean
+   frames (max wait 1.5s). Prevents animating while the main
+   thread is busy hydrating / decoding the hero image.
+========================================= */
+
+let pageReady = false;
+
+function whenPageReady(cb: () => void): () => void {
+  if (pageReady) {
+    cb();
+    return () => {};
+  }
+
+  let cancelled = false;
+
+  const loaded =
+    document.readyState === "complete"
+      ? Promise.resolve()
+      : new Promise<void>((resolve) =>
+          window.addEventListener("load", () => resolve(), { once: true })
+        );
+
+  const fonts: Promise<unknown> = document.fonts?.ready ?? Promise.resolve();
+  const timeout = new Promise<void>((resolve) => window.setTimeout(resolve, 1500));
+
+  Promise.race([Promise.all([loaded, fonts]), timeout]).then(() => {
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        pageReady = true;
+        if (!cancelled) cb();
+      })
+    );
+  });
+
+  return () => {
+    cancelled = true;
+  };
+}
 
 const TECH_STACK = [
   "Node.js",
@@ -54,22 +100,20 @@ const DOT_SPEED = 70;
 /** Approx. seconds between consecutive dots on the same line */
 const DOT_SPACING_SECONDS = 1.8;
 
-/* ---------- LINE + DOT SIZE (change these to resize) ---------- */
+/* ---------- LINE + DOT SIZE ---------- */
 
-/** Thickness of the dashed connection lines */
 const LINE_WIDTH = 2.6;
-/** Dash pattern: "dash gap" */
 const LINE_DASH = "8 9";
-/** Radius of the flowing dot */
 const DOT_RADIUS = 5.5;
-/** Radius of the soft glow ring around the dot */
 const DOT_GLOW_RADIUS = 11;
+
+/** Samples per path in the dot lookup table */
+const LUT_STEPS = 96;
 
 type Side = "top" | "bottom" | "left" | "right";
 
 /* =========================================
    CARD COLOUR TONES
-   [r, g, b] — change these to restyle cards
 ========================================= */
 
 type Tone = "cyan" | "violet" | "orange" | "blue" | "emerald";
@@ -103,7 +147,6 @@ type DiagramEdge = {
 
 /* =========================================
    DEV DIAGRAM DATA
-   highlighted = cyan, normal = violet
 ========================================= */
 
 const DEV_NODES: DiagramNode[] = [
@@ -139,8 +182,6 @@ const DEV_EDGES: DiagramEdge[] = [
 
 /* =========================================
    INFRA DIAGRAM DATA
-   server = orange, kubernetes = blue,
-   shared (source / app) = emerald
 ========================================= */
 
 const INFRA_NODES: DiagramNode[] = [
@@ -217,7 +258,7 @@ const NORMALS: Record<Side, [number, number]> = {
   right: [1, 0],
 };
 
-/** Builds a cubic bezier path and measures its real length. */
+/** Builds a cubic bezier path and measures its approximate length. */
 function buildPath(
   a: DiagramNode,
   b: DiagramNode,
@@ -237,7 +278,6 @@ function buildPath(
   const c2x = x2 + n2x * k;
   const c2y = y2 + n2y * k;
 
-  // approximate bezier length by sampling
   const steps = 40;
   let length = 0;
   let px = x1;
@@ -277,82 +317,122 @@ function buildPath(
 export function Hero() {
   const containerRef = useRef<HTMLDivElement>(null);
   const architectureRef = useRef<HTMLDivElement>(null);
+  const tabsRef = useRef<HTMLDivElement>(null);
   const stageOuterRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLDivElement>(null);
+  const marqueeRef = useRef<HTMLDivElement>(null);
+  const marqueeBoxRef = useRef<HTMLDivElement>(null);
 
-  /** true until the first tab-transition effect has been skipped */
   const isFirstTabRender = useRef(true);
+  const isSwitching = useRef(false);
 
   const [activeTab, setActiveTab] = useState<ArchitectureTab>("dev");
 
   /* ---------- HERO ENTRY ANIMATION ----------
-     - Elements are hidden by CSS (opacity-0) from the very first paint,
-       so there is no flash of final state before GSAP starts.
-     - Runs in a layout effect, AFTER ScaledStage has measured itself,
-       so the layout is already final when the animation begins.
-     - One timeline, no competing tweens.
+     - Everything starts hidden (opacity-0 in CSS): no flash.
+     - Starts only when the page is ready (load + fonts + 2 frames),
+       so it never competes with hydration / image decoding.
+     - The big architecture container is NOT faded (fading a huge
+       subtree is expensive); the diagram staggers its own nodes in.
+     - The marquee only starts moving after the intro finishes.
   ------------------------------------------- */
 
-  useIsoLayoutEffect(() => {
-    const prefersReduced = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
+  useEffect(() => {
+    const ctx = gsap.context(() => {}, containerRef);
 
-    const ctx = gsap.context(() => {
-      if (prefersReduced) {
-        gsap.set([architectureRef.current, imageRef.current], {
-          opacity: 1,
+    const run = () => {
+      ctx.add(() => {
+        if (prefersReducedMotion()) {
+          gsap.set(
+            [
+              architectureRef.current,
+              tabsRef.current,
+              imageRef.current,
+              marqueeRef.current,
+            ],
+            { opacity: 1 }
+          );
+          marqueeBoxRef.current?.setAttribute("data-run", "true");
+          return;
+        }
+
+        gsap.set(architectureRef.current, { opacity: 1 });
+
+        const tl = gsap.timeline({
+          defaults: { ease: "power3.out", force3D: true },
+          onComplete: () =>
+            marqueeBoxRef.current?.setAttribute("data-run", "true"),
         });
-        return;
-      }
 
-      const tl = gsap.timeline({
-        defaults: { ease: "power3.out", duration: 1 },
+        tl.fromTo(
+          tabsRef.current,
+          { opacity: 0, y: -8 },
+          { opacity: 1, y: 0, duration: 0.6, clearProps: "transform" }
+        )
+          .fromTo(
+            imageRef.current,
+            { opacity: 0, scale: 0.96 },
+            { opacity: 1, scale: 1, duration: 0.9, clearProps: "transform" },
+            0.1
+          )
+          .fromTo(
+            marqueeRef.current,
+            { opacity: 0, y: 14 },
+            { opacity: 1, y: 0, duration: 0.7, clearProps: "transform" },
+            0.5
+          );
       });
+    };
 
-      tl.fromTo(
-        architectureRef.current,
-        { opacity: 0, x: -30 },
-        { opacity: 1, x: 0, clearProps: "transform" }
-      ).fromTo(
-        imageRef.current,
-        { opacity: 0, scale: 0.96 },
-        { opacity: 1, scale: 1, clearProps: "transform" },
-        "-=0.8"
-      );
-    }, containerRef);
+    const cancel = whenPageReady(run);
 
-    return () => ctx.revert();
+    return () => {
+      cancel();
+      ctx.revert();
+    };
   }, []);
 
-  /* ---------- TAB TRANSITION (diagram only) ----------
-     Skips the very first run so it never fights the entry animation.
+  /* ---------- TAB TRANSITION ----------
+     1. fade the current diagram out
+     2. swap the tab (Diagram remounts and staggers itself in)
+     3. restore the wrapper before paint
   ---------------------------------------------------- */
 
-  useEffect(() => {
+  const handleTab = (id: ArchitectureTab) => {
+    if (id === activeTab || isSwitching.current) return;
+
+    if (prefersReducedMotion() || !stageOuterRef.current) {
+      setActiveTab(id);
+      return;
+    }
+
+    isSwitching.current = true;
+
+    gsap.to(stageOuterRef.current, {
+      opacity: 0,
+      y: 6,
+      duration: 0.22,
+      ease: "power2.in",
+      overwrite: "auto",
+      onComplete: () => setActiveTab(id),
+    });
+  };
+
+  useIsoLayoutEffect(() => {
     if (isFirstTabRender.current) {
       isFirstTabRender.current = false;
       return;
     }
 
-    if (!stageOuterRef.current) return;
-
-    const tween = gsap.fromTo(
-      stageOuterRef.current,
-      { opacity: 0.65, y: 8 },
-      {
+    if (stageOuterRef.current) {
+      gsap.set(stageOuterRef.current, {
         opacity: 1,
         y: 0,
-        duration: 0.35,
-        ease: "power2.out",
-        overwrite: "auto",
         clearProps: "transform",
-      }
-    );
+      });
+    }
 
-    return () => {
-      tween.kill();
-    };
+    isSwitching.current = false;
   }, [activeTab]);
 
   return (
@@ -361,19 +441,24 @@ export function Hero() {
       ref={containerRef}
       className="pt-[90px] pb-[10px] px-6 min-h-screen flex items-center"
     >
-      {/* Marquee keyframes + hover pause (self-contained, no global CSS needed) */}
+      {/* Marquee keyframes. Paused until the intro finishes (data-run),
+          then runs on the compositor. Hover pauses it. */}
       <style
         dangerouslySetInnerHTML={{
           __html: `
             @keyframes tech-marquee {
-              from { transform: translateX(0); }
-              to   { transform: translateX(-50%); }
+              from { transform: translate3d(0, 0, 0); }
+              to   { transform: translate3d(-50%, 0, 0); }
             }
             .tech-marquee-track {
               animation: tech-marquee ${MARQUEE_DURATION}s linear infinite;
+              animation-play-state: paused;
               will-change: transform;
             }
-            .tech-marquee:hover .tech-marquee-track {
+            .tech-marquee[data-run="true"] .tech-marquee-track {
+              animation-play-state: running;
+            }
+            .tech-marquee[data-run="true"]:hover .tech-marquee-track {
               animation-play-state: paused;
             }
             @media (prefers-reduced-motion: reduce) {
@@ -389,25 +474,34 @@ export function Hero() {
         <div className="grid md:grid-cols-2 gap-10 md:gap-12 items-center">
           {/* ---------- LEFT: ARCHITECTURE MAP ---------- */}
 
-          <div
-            ref={architectureRef}
-            className="relative w-full opacity-0 will-change-transform"
-          >
-            {/* Background glow */}
+          <div ref={architectureRef} className="relative w-full opacity-0">
+            {/* Background glow (radial gradients: no expensive blur filter) */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
-              <div className="absolute top-[20%] left-[25%] w-40 h-40 bg-accent/5 rounded-full blur-3xl" />
-              <div className="absolute bottom-[15%] right-[15%] w-52 h-52 bg-accent/5 rounded-full blur-3xl" />
+              <div
+                className="absolute top-[5%] left-[10%] w-72 h-72 rounded-full"
+                style={{
+                  background:
+                    "radial-gradient(closest-side, rgba(6,182,212,0.10), transparent)",
+                }}
+              />
+              <div
+                className="absolute bottom-[0%] right-[0%] w-80 h-80 rounded-full"
+                style={{
+                  background:
+                    "radial-gradient(closest-side, rgba(139,92,246,0.10), transparent)",
+                }}
+              />
             </div>
 
             {/* DEV / DEPLOY TABS */}
-            <div className="relative z-40 mb-4 flex">
-              <div className="flex items-center p-1 rounded-lg border border-border/60 bg-card/80 backdrop-blur-md">
+            <div ref={tabsRef} className="relative z-40 mb-4 flex opacity-0">
+              <div className="flex items-center p-1 rounded-lg border border-border/60 bg-card">
                 {TABS.map((tab) => (
                   <button
                     key={tab.id}
                     type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`px-5 py-2 rounded-md text-xs font-medium transition-all duration-300 ${
+                    onClick={() => handleTab(tab.id)}
+                    className={`px-5 py-2 rounded-md text-xs font-medium transition-colors duration-300 ${
                       activeTab === tab.id
                         ? "bg-accent text-accent-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
@@ -448,7 +542,7 @@ export function Hero() {
 
           <div
             ref={imageRef}
-            className="flex justify-center md:justify-end opacity-0 will-change-transform"
+            className="flex justify-center md:justify-end opacity-0"
           >
             <div className="relative w-full max-w-sm md:max-w-md aspect-square rounded-2xl overflow-hidden shadow-xl">
               <Image
@@ -465,24 +559,22 @@ export function Hero() {
 
         {/* ================= TECH STACK ================= */}
 
-        <div className="mt-10 w-full">
+        <div ref={marqueeRef} className="mt-10 w-full opacity-0">
           <div className="text-center mb-5">
             <span className="text-sm text-muted-foreground font-medium">
               Tech Stack
             </span>
           </div>
 
-          {/* MARQUEE: single line, clipped inside its own container,
-              always moving, pauses only on hover */}
+          {/* Edge fades are two cheap gradient overlays
+              (a mask-image on a moving element re-composites every frame) */}
           <div
+            ref={marqueeBoxRef}
             className="tech-marquee relative w-full overflow-hidden rounded-xl border border-border/60 bg-card/40 py-3"
-            style={{
-              maskImage:
-                "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
-              WebkitMaskImage:
-                "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
-            }}
           >
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-background to-transparent" />
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-background to-transparent" />
+
             <div className="tech-marquee-track flex w-max flex-nowrap">
               {/* two identical groups -> seamless endless loop */}
               {[0, 1].map((group) => (
@@ -511,8 +603,7 @@ export function Hero() {
 
 /* ================================================= */
 /* SCALED STAGE                                      */
-/* Measures BEFORE first paint (layout effect), so   */
-/* there is no 1x -> scaled "shrink" jump on load.   */
+/* Measures BEFORE first paint (layout effect).      */
 /* ================================================= */
 
 function ScaledStage({
@@ -567,13 +658,20 @@ function ScaledStage({
 
 /* ================================================= */
 /* DIAGRAM                                           */
+/* - SVG holds ONLY the static dashed lines (painted */
+/*   once, never repainted).                         */
+/* - Flowing dots are HTML elements moved with       */
+/*   transform (compositor only), driven by ONE      */
+/*   gsap.ticker callback and a precomputed lookup   */
+/*   table (no getPointAtLength per frame).          */
+/* - Entrance + dots wait for the page to be ready.  */
 /* ================================================= */
 
 type FlowDot = {
   key: string;
-  pathId: string;
+  pathIndex: number;
   dur: number;
-  begin: number;
+  offset: number;
 };
 
 function Diagram({
@@ -589,96 +687,233 @@ function Diagram({
   label: string;
   children?: React.ReactNode;
 }) {
-  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+  const rootRef = useRef<HTMLDivElement>(null);
+  const dotsWrapRef = useRef<HTMLDivElement>(null);
+  const pathRefs = useRef<(SVGPathElement | null)[]>([]);
+  const dotRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  /* ---- 1. build paths + measure real lengths ---- */
+  /* ---- 1. build paths + dots once ---- */
 
-  const paths = edges
-    .map((edge, i) => {
-      const a = nodeMap.get(edge.from);
-      const b = nodeMap.get(edge.to);
-      if (!a || !b) return null;
+  const { paths, dots } = useMemo(() => {
+    const nodeMap = new Map(nodes.map((n) => [n.id, n]));
 
-      const { d, length } = buildPath(a, b, edge);
+    const paths = edges
+      .map((edge, i) => {
+        const a = nodeMap.get(edge.from);
+        const b = nodeMap.get(edge.to);
+        if (!a || !b) return null;
 
-      return {
-        id: `${prefix}-edge-${i}`,
-        d,
-        travel: length / DOT_SPEED, // seconds to travel the full line
-      };
-    })
-    .filter(Boolean) as { id: string; d: string; travel: number }[];
+        const { d, length } = buildPath(a, b, edge);
 
-  /* ---- 2. every line gets its OWN independent, endless loop ---- */
+        return {
+          id: `${prefix}-edge-${i}`,
+          d,
+          travel: length / DOT_SPEED,
+        };
+      })
+      .filter(Boolean) as { id: string; d: string; travel: number }[];
 
-  const dots: FlowDot[] = [];
+    const dots: FlowDot[] = [];
 
-  paths.forEach((p, pi) => {
-    const count = Math.max(1, Math.round(p.travel / DOT_SPACING_SECONDS));
-    const gap = p.travel / count;
-    const lineOffset = (pi * 0.37) % gap;
+    paths.forEach((p, pi) => {
+      const count = Math.max(1, Math.round(p.travel / DOT_SPACING_SECONDS));
+      const gap = p.travel / count;
+      const lineOffset = (pi * 0.37) % gap;
 
-    for (let j = 0; j < count; j++) {
-      dots.push({
-        key: `${p.id}-dot-${j}`,
-        pathId: p.id,
-        dur: p.travel,
-        begin: -(j * gap + lineOffset),
+      for (let j = 0; j < count; j++) {
+        dots.push({
+          key: `${p.id}-dot-${j}`,
+          pathIndex: pi,
+          dur: p.travel,
+          offset: j * gap + lineOffset,
+        });
+      }
+    });
+
+    return { paths, dots };
+  }, [nodes, edges, prefix]);
+
+  /* ---- 2. entrance animation ----
+     Hide immediately (before paint), play when the page is ready. */
+
+  useIsoLayoutEffect(() => {
+    if (prefersReducedMotion()) return;
+
+    const ctx = gsap.context(() => {
+      gsap.set(".dg-node", { opacity: 0, y: 14, scale: 0.94 });
+      gsap.set([".dg-lines", ".dg-dots", ".dg-label"], { opacity: 0 });
+    }, rootRef);
+
+    const cancel = whenPageReady(() => {
+      ctx.add(() => {
+        const tl = gsap.timeline({
+          defaults: { ease: "power3.out", force3D: true },
+        });
+
+        tl.to(".dg-node", {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          duration: 0.6,
+          stagger: 0.045,
+          clearProps: "transform",
+        })
+          .to(".dg-lines", { opacity: 1, duration: 0.6 }, 0.15)
+          .to(".dg-label", { opacity: 1, duration: 0.5 }, 0.3)
+          .to(".dg-dots", { opacity: 1, duration: 0.6 }, 0.7);
       });
-    }
-  });
+    });
+
+    return () => {
+      cancel();
+      ctx.revert();
+    };
+  }, []);
+
+  /* ---- 3. flowing dots: lookup table + single ticker ---- */
+
+  useEffect(() => {
+    if (prefersReducedMotion()) return;
+
+    const wrap = dotsWrapRef.current;
+    if (!wrap) return;
+
+    let ticker: (() => void) | null = null;
+    let delayed: gsap.core.Tween | null = null;
+    let io: IntersectionObserver | null = null;
+
+    const start = () => {
+      // Sample every path ONCE: x/y pairs for LUT_STEPS + 1 points
+      const luts = pathRefs.current.map((path) => {
+        if (!path) return null;
+
+        const len = path.getTotalLength();
+        const arr = new Float32Array((LUT_STEPS + 1) * 2);
+
+        for (let s = 0; s <= LUT_STEPS; s++) {
+          const pt = path.getPointAtLength((len * s) / LUT_STEPS);
+          arr[s * 2] = pt.x;
+          arr[s * 2 + 1] = pt.y;
+        }
+
+        return arr;
+      });
+
+      const startTime = gsap.ticker.time;
+
+      let visible = true;
+      io = new IntersectionObserver(
+        ([entry]) => {
+          visible = entry.isIntersecting;
+        },
+        { threshold: 0 }
+      );
+      io.observe(wrap);
+
+      ticker = () => {
+        if (!visible) return;
+
+        const t = gsap.ticker.time - startTime;
+
+        for (let i = 0; i < dots.length; i++) {
+          const dot = dots[i];
+          const el = dotRefs.current[i];
+          const lut = luts[dot.pathIndex];
+          if (!el || !lut) continue;
+
+          const p = ((t + dot.offset) / dot.dur) % 1;
+
+          // interpolate inside the lookup table
+          const f = p * LUT_STEPS;
+          const i0 = Math.min(LUT_STEPS - 1, Math.floor(f));
+          const k = f - i0;
+
+          const x = lut[i0 * 2] + (lut[(i0 + 1) * 2] - lut[i0 * 2]) * k;
+          const y =
+            lut[i0 * 2 + 1] + (lut[(i0 + 1) * 2 + 1] - lut[i0 * 2 + 1]) * k;
+
+          // fade in at the start, fade out at the end of each line
+          const o = p < 0.08 ? p / 0.08 : p > 0.92 ? (1 - p) / 0.08 : 1;
+
+          el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
+          el.style.opacity = o.toFixed(2);
+        }
+      };
+
+      gsap.ticker.add(ticker);
+    };
+
+    // start moving dots when the dots layer finishes fading in
+    const cancel = whenPageReady(() => {
+      delayed = gsap.delayedCall(0.7, start);
+    });
+
+    return () => {
+      cancel();
+      delayed?.kill();
+      if (ticker) gsap.ticker.remove(ticker);
+      io?.disconnect();
+    };
+  }, [dots]);
 
   return (
-    <div className="absolute inset-0">
-      {/* LINES + FLOWING DOTS */}
+    <div ref={rootRef} className="absolute inset-0">
+      {/* STATIC DASHED LINES (painted once) */}
       <svg
         className="absolute inset-0 w-full h-full pointer-events-none"
         viewBox={`0 0 ${STAGE_W} ${STAGE_H}`}
       >
-        {/* Dashed connection lines (thicker + more visible) */}
         <g
+          className="dg-lines text-muted-foreground/55"
           fill="none"
           stroke="currentColor"
           strokeWidth={LINE_WIDTH}
           strokeDasharray={LINE_DASH}
           strokeLinecap="round"
-          className="text-muted-foreground/55"
         >
-          {paths.map((p) => (
-            <path key={p.id} id={p.id} d={p.d} />
-          ))}
-        </g>
-
-        {/* Flowing dots: glow ring + solid core, moved together as a group */}
-        <g>
-          {dots.map((dot) => (
-            <g key={dot.key} opacity="0">
-              {/* soft glow ring */}
-              <circle r={DOT_GLOW_RADIUS} className="fill-accent" opacity="0.25" />
-              {/* solid dot */}
-              <circle r={DOT_RADIUS} className="fill-accent" />
-
-              <animateMotion
-                dur={`${dot.dur}s`}
-                begin={`${dot.begin}s`}
-                repeatCount="indefinite"
-                calcMode="linear"
-              >
-                <mpath href={`#${dot.pathId}`} />
-              </animateMotion>
-
-              <animate
-                attributeName="opacity"
-                dur={`${dot.dur}s`}
-                begin={`${dot.begin}s`}
-                repeatCount="indefinite"
-                values="0;1;1;0"
-                keyTimes="0;0.08;0.92;1"
-              />
-            </g>
+          {paths.map((p, i) => (
+            <path
+              key={p.id}
+              id={p.id}
+              d={p.d}
+              ref={(el) => {
+                pathRefs.current[i] = el;
+              }}
+            />
           ))}
         </g>
       </svg>
+
+      {/* FLOWING DOTS: own composited layers, moved via transform only */}
+      <div
+        ref={dotsWrapRef}
+        className="dg-dots pointer-events-none absolute inset-0"
+      >
+        {dots.map((dot, i) => (
+          <div
+            key={dot.key}
+            ref={(el) => {
+              dotRefs.current[i] = el;
+            }}
+            className="absolute left-0 top-0 flex items-center justify-center rounded-full bg-accent/25 will-change-transform"
+            style={{
+              width: DOT_GLOW_RADIUS * 2,
+              height: DOT_GLOW_RADIUS * 2,
+              marginLeft: -DOT_GLOW_RADIUS,
+              marginTop: -DOT_GLOW_RADIUS,
+              opacity: 0,
+            }}
+          >
+            <span
+              className="block rounded-full bg-accent"
+              style={{
+                width: DOT_RADIUS * 2,
+                height: DOT_RADIUS * 2,
+              }}
+            />
+          </div>
+        ))}
+      </div>
 
       {/* NODES */}
       {nodes.map((n) => (
@@ -689,7 +924,7 @@ function Diagram({
 
       {/* BOTTOM LABEL */}
       <div
-        className="absolute left-1/2 -translate-x-1/2 text-[11px] text-muted-foreground/60 font-mono tracking-widest whitespace-nowrap"
+        className="dg-label absolute left-1/2 -translate-x-1/2 text-[11px] text-muted-foreground/60 font-mono tracking-widest whitespace-nowrap"
         style={{ top: STAGE_H - 22 }}
       >
         {label}
@@ -700,6 +935,8 @@ function Diagram({
 
 /* ================================================= */
 /* ARCHITECTURE NODE                                 */
+/* Outer wrapper  -> animated ONLY by GSAP           */
+/* Inner card     -> CSS hover (no conflict)         */
 /* ================================================= */
 
 function ArchitectureNode({ node }: { node: DiagramNode }) {
@@ -708,13 +945,8 @@ function ArchitectureNode({ node }: { node: DiagramNode }) {
   const [r, g, b] = TONES[tone];
   const rgba = (a: number) => `rgba(${r}, ${g}, ${b}, ${a})`;
 
-  // Highlighted cards are stronger; normal cards are lighter but still coloured
-  const style: React.CSSProperties = {
-    width: NODE_W,
-    height: NODE_H,
-    left: x - NODE_W / 2,
-    top: y - NODE_H / 2,
-    background: highlighted
+  const cardStyle: React.CSSProperties = {
+    backgroundImage: highlighted
       ? `linear-gradient(135deg, ${rgba(0.4)}, ${rgba(0.16)})`
       : `linear-gradient(135deg, ${rgba(0.24)}, ${rgba(0.09)})`,
     borderColor: highlighted ? rgba(0.95) : rgba(0.6),
@@ -725,31 +957,39 @@ function ArchitectureNode({ node }: { node: DiagramNode }) {
 
   return (
     <div
-      className="
-        group absolute z-10
-        flex flex-col justify-center
-        px-3
-        rounded-lg border-2 backdrop-blur-md
-        transition-all duration-300
-        hover:scale-[1.04]
-      "
-      style={style}
+      className="dg-node absolute z-10"
+      style={{
+        width: NODE_W,
+        height: NODE_H,
+        left: x - NODE_W / 2,
+        top: y - NODE_H / 2,
+      }}
     >
-      <div className="flex items-center gap-2">
-        <span
-          className="block w-2 h-2 rounded-full shrink-0"
-          style={{
-            backgroundColor: rgba(1),
-            boxShadow: `0 0 8px ${rgba(0.9)}`,
-          }}
-        />
-        <span className="text-[15px] font-semibold text-foreground whitespace-nowrap">
-          {title}
-        </span>
-      </div>
+      <div
+        className="
+          flex h-full w-full flex-col justify-center
+          px-3 rounded-lg border-2 bg-card
+          transition-transform duration-300 ease-out
+          hover:scale-[1.04]
+        "
+        style={cardStyle}
+      >
+        <div className="flex items-center gap-2">
+          <span
+            className="block w-2 h-2 rounded-full shrink-0"
+            style={{
+              backgroundColor: rgba(1),
+              boxShadow: `0 0 8px ${rgba(0.9)}`,
+            }}
+          />
+          <span className="text-[15px] font-semibold text-foreground whitespace-nowrap">
+            {title}
+          </span>
+        </div>
 
-      <div className="mt-1 ml-4 text-[11px] text-foreground/70 whitespace-nowrap">
-        {subtitle}
+        <div className="mt-1 ml-4 text-[11px] text-foreground/70 whitespace-nowrap">
+          {subtitle}
+        </div>
       </div>
     </div>
   );
@@ -770,7 +1010,7 @@ function ColumnLabel({
 }) {
   return (
     <div
-      className="absolute -translate-x-1/2 -translate-y-1/2 z-20 text-[10px] font-mono tracking-[0.18em] text-muted-foreground/60 whitespace-nowrap"
+      className="dg-label absolute -translate-x-1/2 -translate-y-1/2 z-20 text-[10px] font-mono tracking-[0.18em] text-muted-foreground/60 whitespace-nowrap"
       style={{ left: x, top: y }}
     >
       {text}

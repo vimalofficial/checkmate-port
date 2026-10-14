@@ -104,12 +104,13 @@ export function Contact() {
               Let’s Build Something Scalable
             </h2>
             <p className="text-muted-foreground text-base !text-black leading-relaxed mb-8">
-              If you're looking for a developer who can design REST APIs, deploy
-              production-ready applications on AWS, configure SSL, integrate
-              payment systems, and build scalable full-stack platforms — let’s
-              connect.
+              I build secure REST APIs and full-stack applications with
+              Node.js, React and Next.js, and deploy them on Linux servers and
+              AWS using Docker, Kubernetes, Nginx and HAProxy. If you need a
+              developer for backend systems, IDP integration, lab automation
+              or production-ready deployments — let’s connect.
             </p>
-            import Image from "next/image";
+
             <div className="space-y-4 text-sm text-muted-foreground">
               {/* Email */}
               <div className="flex items-center gap-2 text-black">
