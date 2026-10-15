@@ -82,14 +82,16 @@ const MARQUEE_DURATION = 30;
 
 /* =========================================
    DIAGRAM CONSTANTS
-   Nodes + lines share ONE 600 x 540
+   Nodes + lines share ONE 600 x 446
    coordinate space, scaled to fit.
+   (Height reduced from 540 -> 446 so the
+   column no longer takes too much height.)
 ========================================= */
 
 const STAGE_W = 600;
-const STAGE_H = 540;
+const STAGE_H = 446;
 const NODE_W = 175;
-const NODE_H = 60;
+const NODE_H = 52;
 
 /** Dot speed in stage px / second (same for every line) */
 const DOT_SPEED = 70;
@@ -152,7 +154,7 @@ const DEV_NODES: DiagramNode[] = [
     title: "MySQL/MongoDB",
     subtitle: "Database",
     x: 90,
-    y: 45,
+    y: 40,
     tone: "violet",
   },
   {
@@ -160,7 +162,7 @@ const DEV_NODES: DiagramNode[] = [
     title: "Redis",
     subtitle: "Cache",
     x: 90,
-    y: 205,
+    y: 175,
     tone: "violet",
   },
   {
@@ -168,7 +170,7 @@ const DEV_NODES: DiagramNode[] = [
     title: "Google IDP",
     subtitle: "Identity Provider",
     x: 90,
-    y: 375,
+    y: 310,
     tone: "cyan",
     highlighted: true,
   },
@@ -179,7 +181,7 @@ const DEV_NODES: DiagramNode[] = [
     title: "Prisma ORM",
     subtitle: "Data Layer",
     x: 300,
-    y: 130,
+    y: 105,
     tone: "cyan",
     highlighted: true,
   },
@@ -188,7 +190,7 @@ const DEV_NODES: DiagramNode[] = [
     title: "REST APIs",
     subtitle: "Node.js / Express",
     x: 300,
-    y: 290,
+    y: 240,
     tone: "cyan",
     highlighted: true,
   },
@@ -197,7 +199,7 @@ const DEV_NODES: DiagramNode[] = [
     title: "React / Next.js",
     subtitle: "Frontend",
     x: 300,
-    y: 460,
+    y: 375,
     tone: "cyan",
     highlighted: true,
   },
@@ -208,7 +210,7 @@ const DEV_NODES: DiagramNode[] = [
     title: "HF Proxy",
     subtitle: "Model Gateway",
     x: 510,
-    y: 45,
+    y: 40,
     tone: "violet",
   },
   {
@@ -216,7 +218,7 @@ const DEV_NODES: DiagramNode[] = [
     title: "JWT",
     subtitle: "Authentication",
     x: 510,
-    y: 205,
+    y: 170,
     tone: "violet",
   },
   {
@@ -224,7 +226,7 @@ const DEV_NODES: DiagramNode[] = [
     title: "Webhooks",
     subtitle: "3rd Party",
     x: 510,
-    y: 290,
+    y: 240,
     tone: "violet",
   },
   {
@@ -232,7 +234,7 @@ const DEV_NODES: DiagramNode[] = [
     title: "Payment Gateway",
     subtitle: "External Service",
     x: 510,
-    y: 375,
+    y: 310,
     tone: "violet",
   },
 ];
@@ -272,7 +274,7 @@ const INFRA_NODES: DiagramNode[] = [
     title: "Development",
     subtitle: "Source Code",
     x: 300,
-    y: 40,
+    y: 36,
     tone: "emerald",
     highlighted: true,
   },
@@ -283,7 +285,7 @@ const INFRA_NODES: DiagramNode[] = [
     title: "Git Clone",
     subtitle: "Server Checkout",
     x: 95,
-    y: 145,
+    y: 125,
     tone: "orange",
   },
   {
@@ -291,7 +293,7 @@ const INFRA_NODES: DiagramNode[] = [
     title: "Ubuntu Server",
     subtitle: "VM / Linux",
     x: 95,
-    y: 230,
+    y: 191,
     tone: "orange",
     highlighted: true,
   },
@@ -300,7 +302,7 @@ const INFRA_NODES: DiagramNode[] = [
     title: "PM2",
     subtitle: "Process Manager",
     x: 95,
-    y: 315,
+    y: 257,
     tone: "orange",
     highlighted: true,
   },
@@ -309,7 +311,7 @@ const INFRA_NODES: DiagramNode[] = [
     title: "Nginx / SSL",
     subtitle: "Reverse Proxy",
     x: 95,
-    y: 400,
+    y: 323,
     tone: "orange",
   },
 
@@ -319,7 +321,7 @@ const INFRA_NODES: DiagramNode[] = [
     title: "K8s YAML",
     subtitle: "Deployment Manifests",
     x: 505,
-    y: 145,
+    y: 125,
     tone: "blue",
   },
   {
@@ -327,7 +329,7 @@ const INFRA_NODES: DiagramNode[] = [
     title: "Kube Master",
     subtitle: "Control Plane",
     x: 505,
-    y: 230,
+    y: 191,
     tone: "blue",
     highlighted: true,
   },
@@ -336,7 +338,7 @@ const INFRA_NODES: DiagramNode[] = [
     title: "K8s Service",
     subtitle: "Cluster Service",
     x: 505,
-    y: 315,
+    y: 257,
     tone: "blue",
     highlighted: true,
   },
@@ -345,7 +347,7 @@ const INFRA_NODES: DiagramNode[] = [
     title: "NodePort / Ingress",
     subtitle: "External Entry Point",
     x: 505,
-    y: 400,
+    y: 323,
     tone: "blue",
   },
 
@@ -355,7 +357,7 @@ const INFRA_NODES: DiagramNode[] = [
     title: "Application",
     subtitle: "Frontend UI",
     x: 300,
-    y: 485,
+    y: 392,
     tone: "emerald",
     highlighted: true,
   },
@@ -604,7 +606,11 @@ export function Hero() {
     <section
       id="home"
       ref={containerRef}
-      className="pt-[10px] pb-[10px] pl-5 min-h-screen flex items-center"
+      /* pt-24 on mobile pushes the tabs BELOW the fixed navbar.
+         Desktop keeps the original tight padding.
+         Change pt-24 to match your navbar height if needed
+         (pt-20 = 80px, pt-28 = 112px). */
+      className="pt-24 md:pt-[10px] pb-[10px] pl-5 min-h-screen flex items-center"
     >
       {/* Marquee keyframes. Paused until the intro finishes (data-run),
           then runs on the compositor. Hover pauses it. */}
@@ -636,18 +642,18 @@ export function Hero() {
       <div className="max-w-7xl mx-auto w-full">
         {/* ================= MAIN HERO ================= */}
 
-        {/* Two separate columns, vertically centered (like your original).
+        {/* Two separate columns, vertically centered.
             left  = 1 part    (architecture diagram)
             right = 1.15 part (image) */}
-        <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] gap-12 lg:gap-7 items-center">
+        <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] items-center">
           {/* ---------- LEFT COLUMN: ARCHITECTURE MAP ---------- */}
 
           <div
             ref={architectureRef}
-            className="relative w-full min-w-0 opacity-0"
+            className="relative w-full min-w-0 opacity-0 pr-3"
           >
             {/* Background glow */}
-            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+            <div className="absolute inset-0 p-2 pointer-events-none overflow-hidden">
               <div
                 className="absolute top-[5%] left-[10%] w-72 h-72 rounded-full"
                 style={{
@@ -666,7 +672,7 @@ export function Hero() {
             </div>
 
             {/* DEV / DEPLOY TABS */}
-            <div ref={tabsRef} className="relative z-40 mb-4 flex opacity-0">
+            <div ref={tabsRef} className="relative z-10 mb-3 flex opacity-0">
               <div className="flex items-center p-1 rounded-lg border border-border/60 bg-card">
                 {TABS.map((tab) => (
                   <button
@@ -703,8 +709,8 @@ export function Hero() {
                   edges={INFRA_EDGES}
                   label="INFRASTRUCTURE / DEPLOYMENT"
                 >
-                  <ColumnLabel text="SERVER DEPLOYMENT" x={95} y={100} />
-                  <ColumnLabel text="KUBERNETES DEPLOYMENT" x={505} y={100} />
+                  <ColumnLabel text="SERVER DEPLOYMENT" x={95} y={80} />
+                  <ColumnLabel text="KUBERNETES DEPLOYMENT" x={505} y={80} />
                 </Diagram>
               )}
             </ScaledStage>
@@ -1215,7 +1221,7 @@ function ArchitectureNode({ node }: { node: DiagramNode }) {
           </span>
         </div>
 
-        <div className="mt-1 ml-4 text-[11px] text-foreground/70 whitespace-nowrap">
+        <div className="mt-0.5 ml-4 text-[11px] text-foreground/70 whitespace-nowrap">
           {subtitle}
         </div>
       </div>
