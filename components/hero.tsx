@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import gsap from "gsap";
 import Image from "next/image";
 
@@ -41,18 +35,20 @@ function whenPageReady(cb: () => void): () => void {
     document.readyState === "complete"
       ? Promise.resolve()
       : new Promise<void>((resolve) =>
-          window.addEventListener("load", () => resolve(), { once: true })
+          window.addEventListener("load", () => resolve(), { once: true }),
         );
 
   const fonts: Promise<unknown> = document.fonts?.ready ?? Promise.resolve();
-  const timeout = new Promise<void>((resolve) => window.setTimeout(resolve, 1500));
+  const timeout = new Promise<void>((resolve) =>
+    window.setTimeout(resolve, 1500),
+  );
 
   Promise.race([Promise.all([loaded, fonts]), timeout]).then(() => {
     requestAnimationFrame(() =>
       requestAnimationFrame(() => {
         pageReady = true;
         if (!cancelled) cb();
-      })
+      }),
     );
   });
 
@@ -151,24 +147,104 @@ type DiagramEdge = {
 
 const DEV_NODES: DiagramNode[] = [
   // Left column
-  { id: "mysql", title: "MySQL/MongoDB", subtitle: "Database", x: 90, y: 45, tone: "violet" },
-  { id: "redis", title: "Redis", subtitle: "Cache", x: 90, y: 205, tone: "violet" },
-  { id: "google", title: "Google IDP", subtitle: "Identity Provider", x: 90, y: 375, tone: "cyan", highlighted: true },
+  {
+    id: "mysql",
+    title: "MySQL/MongoDB",
+    subtitle: "Database",
+    x: 90,
+    y: 45,
+    tone: "violet",
+  },
+  {
+    id: "redis",
+    title: "Redis",
+    subtitle: "Cache",
+    x: 90,
+    y: 205,
+    tone: "violet",
+  },
+  {
+    id: "google",
+    title: "Google IDP",
+    subtitle: "Identity Provider",
+    x: 90,
+    y: 375,
+    tone: "cyan",
+    highlighted: true,
+  },
 
   // Center column
-  { id: "prisma", title: "Prisma ORM", subtitle: "Data Layer", x: 300, y: 130, tone: "cyan", highlighted: true },
-  { id: "api", title: "REST APIs", subtitle: "Node.js / Express", x: 300, y: 290, tone: "cyan", highlighted: true },
-  { id: "react", title: "React / Next.js", subtitle: "Frontend", x: 300, y: 460, tone: "cyan", highlighted: true },
+  {
+    id: "prisma",
+    title: "Prisma ORM",
+    subtitle: "Data Layer",
+    x: 300,
+    y: 130,
+    tone: "cyan",
+    highlighted: true,
+  },
+  {
+    id: "api",
+    title: "REST APIs",
+    subtitle: "Node.js / Express",
+    x: 300,
+    y: 290,
+    tone: "cyan",
+    highlighted: true,
+  },
+  {
+    id: "react",
+    title: "React / Next.js",
+    subtitle: "Frontend",
+    x: 300,
+    y: 460,
+    tone: "cyan",
+    highlighted: true,
+  },
 
   // Right column
-  { id: "hfproxy", title: "HF Proxy", subtitle: "Model Gateway", x: 510, y: 45, tone: "violet" },
-  { id: "jwt", title: "JWT", subtitle: "Authentication", x: 510, y: 205, tone: "violet" },
-  { id: "webhooks", title: "Webhooks", subtitle: "3rd Party", x: 510, y: 290, tone: "violet" },
-  { id: "payment", title: "Payment Gateway", subtitle: "External Service", x: 510, y: 375, tone: "violet" },
+  {
+    id: "hfproxy",
+    title: "HF Proxy",
+    subtitle: "Model Gateway",
+    x: 510,
+    y: 45,
+    tone: "violet",
+  },
+  {
+    id: "jwt",
+    title: "JWT",
+    subtitle: "Authentication",
+    x: 510,
+    y: 205,
+    tone: "violet",
+  },
+  {
+    id: "webhooks",
+    title: "Webhooks",
+    subtitle: "3rd Party",
+    x: 510,
+    y: 290,
+    tone: "violet",
+  },
+  {
+    id: "payment",
+    title: "Payment Gateway",
+    subtitle: "External Service",
+    x: 510,
+    y: 375,
+    tone: "violet",
+  },
 ];
 
 const DEV_EDGES: DiagramEdge[] = [
-  { from: "mysql", to: "prisma", fromSide: "right", toSide: "left", toOff: -10 },
+  {
+    from: "mysql",
+    to: "prisma",
+    fromSide: "right",
+    toSide: "left",
+    toOff: -10,
+  },
   { from: "redis", to: "prisma", fromSide: "right", toSide: "left", toOff: 10 },
   { from: "hfproxy", to: "prisma", fromSide: "left", toSide: "right" },
   { from: "prisma", to: "api", fromSide: "bottom", toSide: "top" },
@@ -176,7 +252,13 @@ const DEV_EDGES: DiagramEdge[] = [
   { from: "webhooks", to: "api", fromSide: "left", toSide: "right" },
   { from: "payment", to: "api", fromSide: "left", toSide: "bottom", toOff: 45 },
   { from: "google", to: "api", fromSide: "right", toSide: "left", toOff: 12 },
-  { from: "api", to: "redis", fromSide: "left", toSide: "bottom", fromOff: -12 },
+  {
+    from: "api",
+    to: "redis",
+    fromSide: "left",
+    toSide: "bottom",
+    fromOff: -12,
+  },
   { from: "api", to: "react", fromSide: "bottom", toSide: "top" },
 ];
 
@@ -185,28 +267,116 @@ const DEV_EDGES: DiagramEdge[] = [
 ========================================= */
 
 const INFRA_NODES: DiagramNode[] = [
-  { id: "source", title: "Development", subtitle: "Source Code", x: 300, y: 40, tone: "emerald", highlighted: true },
+  {
+    id: "source",
+    title: "Development",
+    subtitle: "Source Code",
+    x: 300,
+    y: 40,
+    tone: "emerald",
+    highlighted: true,
+  },
 
   // Server deployment (left)
-  { id: "clone", title: "Git Clone", subtitle: "Server Checkout", x: 95, y: 145, tone: "orange" },
-  { id: "ubuntu", title: "Ubuntu Server", subtitle: "VM / Linux", x: 95, y: 230, tone: "orange", highlighted: true },
-  { id: "pm2", title: "PM2", subtitle: "Process Manager", x: 95, y: 315, tone: "orange", highlighted: true },
-  { id: "nginx", title: "Nginx / SSL", subtitle: "Reverse Proxy", x: 95, y: 400, tone: "orange" },
+  {
+    id: "clone",
+    title: "Git Clone",
+    subtitle: "Server Checkout",
+    x: 95,
+    y: 145,
+    tone: "orange",
+  },
+  {
+    id: "ubuntu",
+    title: "Ubuntu Server",
+    subtitle: "VM / Linux",
+    x: 95,
+    y: 230,
+    tone: "orange",
+    highlighted: true,
+  },
+  {
+    id: "pm2",
+    title: "PM2",
+    subtitle: "Process Manager",
+    x: 95,
+    y: 315,
+    tone: "orange",
+    highlighted: true,
+  },
+  {
+    id: "nginx",
+    title: "Nginx / SSL",
+    subtitle: "Reverse Proxy",
+    x: 95,
+    y: 400,
+    tone: "orange",
+  },
 
   // Kubernetes deployment (right)
-  { id: "yaml", title: "K8s YAML", subtitle: "Deployment Manifests", x: 505, y: 145, tone: "blue" },
-  { id: "master", title: "Kube Master", subtitle: "Control Plane", x: 505, y: 230, tone: "blue", highlighted: true },
-  { id: "service", title: "K8s Service", subtitle: "Cluster Service", x: 505, y: 315, tone: "blue", highlighted: true },
-  { id: "ingress", title: "NodePort / Ingress", subtitle: "External Entry Point", x: 505, y: 400, tone: "blue" },
+  {
+    id: "yaml",
+    title: "K8s YAML",
+    subtitle: "Deployment Manifests",
+    x: 505,
+    y: 145,
+    tone: "blue",
+  },
+  {
+    id: "master",
+    title: "Kube Master",
+    subtitle: "Control Plane",
+    x: 505,
+    y: 230,
+    tone: "blue",
+    highlighted: true,
+  },
+  {
+    id: "service",
+    title: "K8s Service",
+    subtitle: "Cluster Service",
+    x: 505,
+    y: 315,
+    tone: "blue",
+    highlighted: true,
+  },
+  {
+    id: "ingress",
+    title: "NodePort / Ingress",
+    subtitle: "External Entry Point",
+    x: 505,
+    y: 400,
+    tone: "blue",
+  },
 
   // Shared
-  { id: "app", title: "Application", subtitle: "Frontend UI", x: 300, y: 485, tone: "emerald", highlighted: true },
+  {
+    id: "app",
+    title: "Application",
+    subtitle: "Frontend UI",
+    x: 300,
+    y: 485,
+    tone: "emerald",
+    highlighted: true,
+  },
 ];
 
 const INFRA_EDGES: DiagramEdge[] = [
   // Source branches
-  { from: "source", to: "clone", fromSide: "bottom", toSide: "right", fromOff: -40 },
-  { from: "source", to: "yaml", fromSide: "bottom", toSide: "left", fromOff: 40 },
+  {
+    from: "source",
+    to: "clone",
+    fromSide: "bottom",
+    toSide: "right",
+    fromOff: -40,
+  },
+  {
+    from: "source",
+    to: "yaml",
+    fromSide: "bottom",
+    toSide: "left",
+    fromOff: 40,
+  },
 
   // Server flow
   { from: "clone", to: "ubuntu", fromSide: "bottom", toSide: "top" },
@@ -234,11 +404,7 @@ const TABS: { id: ArchitectureTab; label: string }[] = [
    GEOMETRY HELPERS
 ========================================= */
 
-function anchorPoint(
-  n: DiagramNode,
-  side: Side,
-  off = 0
-): [number, number] {
+function anchorPoint(n: DiagramNode, side: Side, off = 0): [number, number] {
   switch (side) {
     case "top":
       return [n.x + off, n.y - NODE_H / 2];
@@ -262,7 +428,7 @@ const NORMALS: Record<Side, [number, number]> = {
 function buildPath(
   a: DiagramNode,
   b: DiagramNode,
-  edge: DiagramEdge
+  edge: DiagramEdge,
 ): { d: string; length: number } {
   const [x1, y1] = anchorPoint(a, edge.fromSide, edge.fromOff ?? 0);
   const [x2, y2] = anchorPoint(b, edge.toSide, edge.toOff ?? 0);
@@ -313,7 +479,6 @@ function buildPath(
 /* =========================================
    HERO
 ========================================= */
-
 export function Hero() {
   const containerRef = useRef<HTMLDivElement>(null);
   const architectureRef = useRef<HTMLDivElement>(null);
@@ -350,7 +515,7 @@ export function Hero() {
               imageRef.current,
               marqueeRef.current,
             ],
-            { opacity: 1 }
+            { opacity: 1 },
           );
           marqueeBoxRef.current?.setAttribute("data-run", "true");
           return;
@@ -367,19 +532,19 @@ export function Hero() {
         tl.fromTo(
           tabsRef.current,
           { opacity: 0, y: -8 },
-          { opacity: 1, y: 0, duration: 0.6, clearProps: "transform" }
+          { opacity: 1, y: 0, duration: 0.6, clearProps: "transform" },
         )
           .fromTo(
             imageRef.current,
             { opacity: 0, scale: 0.96 },
             { opacity: 1, scale: 1, duration: 0.9, clearProps: "transform" },
-            0.1
+            0.1,
           )
           .fromTo(
             marqueeRef.current,
             { opacity: 0, y: 14 },
             { opacity: 1, y: 0, duration: 0.7, clearProps: "transform" },
-            0.5
+            0.5,
           );
       });
     };
@@ -439,7 +604,7 @@ export function Hero() {
     <section
       id="home"
       ref={containerRef}
-      className="pt-[90px] pb-[10px] px-6 min-h-screen flex items-center"
+      className="pt-[10px] pb-[10px] pl-5 min-h-screen flex items-center"
     >
       {/* Marquee keyframes. Paused until the intro finishes (data-run),
           then runs on the compositor. Hover pauses it. */}
@@ -468,14 +633,20 @@ export function Hero() {
         }}
       />
 
-      <div className="max-w-6xl mx-auto w-full">
+      <div className="max-w-7xl mx-auto w-full">
         {/* ================= MAIN HERO ================= */}
 
-        <div className="grid md:grid-cols-2 gap-10 md:gap-12 items-center">
-          {/* ---------- LEFT: ARCHITECTURE MAP ---------- */}
+        {/* Two separate columns, vertically centered (like your original).
+            left  = 1 part    (architecture diagram)
+            right = 1.15 part (image) */}
+        <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] gap-12 lg:gap-7 items-center">
+          {/* ---------- LEFT COLUMN: ARCHITECTURE MAP ---------- */}
 
-          <div ref={architectureRef} className="relative w-full opacity-0">
-            {/* Background glow (radial gradients: no expensive blur filter) */}
+          <div
+            ref={architectureRef}
+            className="relative w-full min-w-0 opacity-0"
+          >
+            {/* Background glow */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
               <div
                 className="absolute top-[5%] left-[10%] w-72 h-72 rounded-full"
@@ -484,8 +655,9 @@ export function Hero() {
                     "radial-gradient(closest-side, rgba(6,182,212,0.10), transparent)",
                 }}
               />
+
               <div
-                className="absolute bottom-[0%] right-[0%] w-80 h-80 rounded-full"
+                className="absolute bottom-0 right-0 w-80 h-80 rounded-full"
                 style={{
                   background:
                     "radial-gradient(closest-side, rgba(139,92,246,0.10), transparent)",
@@ -538,59 +710,115 @@ export function Hero() {
             </ScaledStage>
           </div>
 
-          {/* ---------- RIGHT: IMAGE ---------- */}
+          {/* ---------- RIGHT COLUMN: IMAGE ---------- */}
 
-          <div
-            ref={imageRef}
-            className="flex justify-center md:justify-end opacity-0"
-          >
-            <div className="relative w-full max-w-sm md:max-w-md aspect-square rounded-2xl overflow-hidden shadow-xl">
-              <Image
-                src="/brand-icon.png"
-                alt="Vimal - Full-Stack Developer"
-                fill
-                priority
-                className="object-cover"
-                sizes="(max-width: 768px) 80vw, 400px"
-              />
-            </div>
+          <div ref={imageRef} className="w-full min-w-0 opacity-0">
+            {/* Natural proportions, full column width.
+                No fixed height, no crop, no zoom: the whole image
+                is always visible and can't be cut off. */}
+            <Image
+              src="/stretched-image (1).png"
+              alt="Vimal - Full-Stack Developer"
+              width={1000}
+              height={1000}
+              priority
+              className="w-full h-auto"
+              sizes="(max-width: 768px) 100vw, (max-width: 1280px) 55vw, 700px"
+            />
           </div>
         </div>
 
         {/* ================= TECH STACK ================= */}
 
-        <div ref={marqueeRef} className="mt-10 w-full opacity-0">
+        <div ref={marqueeRef} className=" w-full opacity-0">
           <div className="text-center mb-5">
             <span className="text-sm text-muted-foreground font-medium">
               Tech Stack
             </span>
           </div>
 
-          {/* Edge fades are two cheap gradient overlays
-              (a mask-image on a moving element re-composites every frame) */}
           <div
             ref={marqueeBoxRef}
-            className="tech-marquee relative w-full overflow-hidden rounded-xl border border-border/60 bg-card/40 py-3"
+            className="tech-marquee relative w-full overflow-hidden rounded-xl border border-border/60 bg-card/40 py-4"
           >
-            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-background to-transparent" />
-            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-background to-transparent" />
+            {/* Left corner fade */}
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-20 bg-gradient-to-r from-background via-background/80 to-transparent" />
 
+            {/* Right corner fade */}
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-20 bg-gradient-to-l from-background via-background/80 to-transparent" />
+
+            {/* Infinite marquee track */}
             <div className="tech-marquee-track flex w-max flex-nowrap">
-              {/* two identical groups -> seamless endless loop */}
               {[0, 1].map((group) => (
                 <div
                   key={group}
                   className="flex flex-nowrap shrink-0"
                   aria-hidden={group === 1}
                 >
-                  {TECH_STACK.map((tech) => (
-                    <div
-                      key={`${group}-${tech}`}
-                      className="mr-3 shrink-0 whitespace-nowrap px-4 py-1.5 bg-card border border-border rounded-md text-xs text-muted-foreground"
-                    >
-                      {tech}
-                    </div>
-                  ))}
+                  {TECH_STACK.map((tech, index) => {
+                    const colors = [
+                      {
+                        text: "text-cyan-400",
+                        border: "border-cyan-500/40",
+                        bg: "bg-cyan-500/10",
+                        glow: "hover:shadow-cyan-500/20",
+                        dot: "bg-cyan-400",
+                      },
+                      {
+                        text: "text-violet-400",
+                        border: "border-violet-500/40",
+                        bg: "bg-violet-500/10",
+                        glow: "hover:shadow-violet-500/20",
+                        dot: "bg-violet-400",
+                      },
+                      {
+                        text: "text-orange-400",
+                        border: "border-orange-500/40",
+                        bg: "bg-orange-500/10",
+                        glow: "hover:shadow-orange-500/20",
+                        dot: "bg-orange-400",
+                      },
+                      {
+                        text: "text-blue-400",
+                        border: "border-blue-500/40",
+                        bg: "bg-blue-500/10",
+                        glow: "hover:shadow-blue-500/20",
+                        dot: "bg-blue-400",
+                      },
+                      {
+                        text: "text-emerald-400",
+                        border: "border-emerald-500/40",
+                        bg: "bg-emerald-500/10",
+                        glow: "hover:shadow-emerald-500/20",
+                        dot: "bg-emerald-400",
+                      },
+                    ];
+
+                    const color = colors[index % colors.length];
+
+                    return (
+                      <div
+                        key={`${group}-${tech}`}
+                        className={`
+                  group mr-3 shrink-0 whitespace-nowrap
+                  flex items-center gap-2
+                  rounded-lg border px-4 py-2
+                  text-xs font-medium
+                  transition-all duration-300
+                  hover:-translate-y-0.5 hover:shadow-lg
+                  ${color.text}
+                  ${color.border}
+                  ${color.bg}
+                  ${color.glow}
+                `}
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 shrink-0 rounded-full ${color.dot}`}
+                        />
+                        {tech}
+                      </div>
+                    );
+                  })}
                 </div>
               ))}
             </div>
@@ -806,7 +1034,7 @@ function Diagram({
         ([entry]) => {
           visible = entry.isIntersecting;
         },
-        { threshold: 0 }
+        { threshold: 0 },
       );
       io.observe(wrap);
 
@@ -999,15 +1227,7 @@ function ArchitectureNode({ node }: { node: DiagramNode }) {
 /* COLUMN LABEL (infra)                              */
 /* ================================================= */
 
-function ColumnLabel({
-  text,
-  x,
-  y,
-}: {
-  text: string;
-  x: number;
-  y: number;
-}) {
+function ColumnLabel({ text, x, y }: { text: string; x: number; y: number }) {
   return (
     <div
       className="dg-label absolute -translate-x-1/2 -translate-y-1/2 z-20 text-[10px] font-mono tracking-[0.18em] text-muted-foreground/60 whitespace-nowrap"

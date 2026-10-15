@@ -977,12 +977,34 @@ export function Navbar() {
             </div>
 
             {/* Mobile Resume */}
-            <div className="menu-item mt-2">
+            {/* <div className="menu-item mt-2">
               <ResumeButton
                 mobile
                 loading={loading}
                 onClick={prepareResumePopup}
               />
+
+              <ResumeButton
+                loading={false}
+                onClick={() => {
+                  window.location.href =
+                    "https://drive.google.com/file/d/1vYA7dXFQ0ybnJkzvZoaj6MYLij-43ArR/view?usp=sharing";
+                }}
+              />
+            </div> */}
+
+            {/* Mobile Resume */}
+            <div className="menu-item mt-2 w-full">
+              <div className="w-full [&>*]:w-full">
+                <ResumeButton
+                  mobile
+                  loading={false}
+                  onClick={() => {
+                    window.location.href =
+                      "https://drive.google.com/file/d/1vYA7dXFQ0ybnJkzvZoaj6MYLij-43ArR/view?usp=sharing";
+                  }}
+                />
+              </div>
             </div>
           </div>
         </div>
